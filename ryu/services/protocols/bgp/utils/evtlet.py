@@ -16,7 +16,8 @@
 """
  Concurrent networking library - Eventlet, based utilities classes.
 """
-from ryu.lib import hub
+import eventlet
+from eventlet import event
 import logging
 
 LOG = logging.getLogger('utils.evtlet')
@@ -27,7 +28,7 @@ class EventletIOFactory(object):
     @staticmethod
     def create_custom_event():
         LOG.debug('Create CustomEvent called')
-        return hub.Event()
+        return CustomEvent()
 
     @staticmethod
     def create_looping_call(funct, *args, **kwargs):
@@ -35,7 +36,50 @@ class EventletIOFactory(object):
         return LoopingCall(funct, *args, **kwargs)
 
 
-# TODO: improve Timer service and move it into framework
+class CustomEvent(object):
+    """Encapsulates eventlet event to provide a event which can recur.
+
+    It has the same interface as threading.Event but works for eventlet.
+    """
+    def __init__(self,):
+        self._event = event.Event()
+        self._is_set = False
+
+    def is_set(self):
+        """Return true if and only if the internal flag is true."""
+        return self._is_set
+
+    def set(self):
+        """Set the internal flag to true.
+
+         All threads waiting for it to become true are awakened.
+         Threads that call wait() once the flag is true will not block at all.
+        """
+        if self._event and not self._event.ready():
+            self._event.send()
+        self._is_set = True
+
+    def clear(self):
+        """Reset the internal flag to false.
+
+        Subsequently, threads calling wait() will block until set() is called
+        to set the internal flag to true again.
+        """
+        if self._is_set:
+            self._is_set = False
+            self._event = event.Event()
+
+    def wait(self):
+        """Block until the internal flag is true.
+
+        If the internal flag is true on entry, return immediately. Otherwise,
+        block until another thread calls set() to set the flag to true, or
+        until the optional timeout occurs.
+        """
+        if not self._is_set:
+            self._event.wait()
+
+
 class LoopingCall(object):
     """Call a function repeatedly.
     """
@@ -58,7 +102,7 @@ class LoopingCall(object):
     def __call__(self):
         if self._running:
             # Schedule next iteration of the call.
-            self._self_thread = hub.spawn_after(self._interval, self)
+            self._self_thread = eventlet.spawn_after(self._interval, self)
         self._funct(*self._args, **self._kwargs)
 
     def start(self, interval, now=True):
@@ -73,9 +117,9 @@ class LoopingCall(object):
         self._running = True
         self._interval = interval
         if now:
-            self._self_thread = hub.spawn_after(0, self)
+            self._self_thread = eventlet.spawn_after(0, self)
         else:
-            self._self_thread = hub.spawn_after(self._interval, self)
+            self._self_thread = eventlet.spawn_after(self._interval, self)
 
     def stop(self):
         """Stop running scheduled function.
@@ -93,4 +137,4 @@ class LoopingCall(object):
             self._self_thread.cancel()
             self._self_thread = None
         # Schedule a new call
-        self._self_thread = hub.spawn_after(self._interval, self)
+        self._self_thread = eventlet.spawn_after(self._interval, self)

@@ -33,9 +33,9 @@ from ryu.services.protocols.bgp.rtconf.vrfs import VrfConf
 LOG = logging.getLogger('bgpspeaker.api.rtconf')
 
 
-# =============================================================================
+#==============================================================================
 # Neighbor configuration related APIs
-# =============================================================================
+#==============================================================================
 
 
 def _get_neighbor_conf(neigh_ip_address):
@@ -112,67 +112,9 @@ def get_neighbors_conf():
     return CORE_MANAGER.neighbors_conf.settings
 
 
-@RegisterWithArgChecks(name='neighbor.in_filter.get',
-                       req_args=[neighbors.IP_ADDRESS])
-def get_neighbor_in_filter(neigh_ip_address):
-    """Returns a neighbor in_filter for given ip address if exists."""
-    core = CORE_MANAGER.get_core_service()
-    peer = core.peer_manager.get_by_addr(neigh_ip_address)
-    return peer.in_filters
-
-
-@RegisterWithArgChecks(name='neighbor.in_filter.set',
-                       req_args=[neighbors.IP_ADDRESS, neighbors.IN_FILTER])
-def set_neighbor_in_filter(neigh_ip_address, filters):
-    """Returns a neighbor in_filter for given ip address if exists."""
-    core = CORE_MANAGER.get_core_service()
-    peer = core.peer_manager.get_by_addr(neigh_ip_address)
-    peer.in_filters = filters
-    return True
-
-
-@RegisterWithArgChecks(name='neighbor.out_filter.get',
-                       req_args=[neighbors.IP_ADDRESS])
-def get_neighbor_out_filter(neigh_ip_address):
-    """Returns a neighbor out_filter for given ip address if exists."""
-    core = CORE_MANAGER.get_core_service()
-    ret = core.peer_manager.get_by_addr(neigh_ip_address).out_filters
-    return ret
-
-
-@RegisterWithArgChecks(name='neighbor.out_filter.set',
-                       req_args=[neighbors.IP_ADDRESS, neighbors.OUT_FILTER])
-def set_neighbor_in_filter(neigh_ip_address, filters):
-    """Returns a neighbor in_filter for given ip address if exists."""
-    core = CORE_MANAGER.get_core_service()
-    peer = core.peer_manager.get_by_addr(neigh_ip_address)
-    peer.out_filters = filters
-    return True
-
-
-@RegisterWithArgChecks(name='neighbor.attribute_map.set',
-                       req_args=[neighbors.IP_ADDRESS,
-                                 neighbors.ATTRIBUTE_MAP])
-def set_neighbor_attribute_map(neigh_ip_address, attribute_maps):
-    """Returns a neighbor attribute_map for given ip address if exists."""
-    core = CORE_MANAGER.get_core_service()
-    peer = core.peer_manager.get_by_addr(neigh_ip_address)
-    peer.attribute_maps = attribute_maps
-    return True
-
-
-@RegisterWithArgChecks(name='neighbor.attribute_map.get',
-                       req_args=[neighbors.IP_ADDRESS])
-def get_neighbor_attribute_map(neigh_ip_address):
-    """Returns a neighbor attribute_map for given ip address if exists."""
-    core = CORE_MANAGER.get_core_service()
-    ret = core.peer_manager.get_by_addr(neigh_ip_address).attribute_maps
-    return ret
-
-# =============================================================================
+#==============================================================================
 # VRF configuration related APIs
-# =============================================================================
-
+#==============================================================================
 
 @register(name='vrf.create')
 def create_vrf(**kwargs):
@@ -226,36 +168,13 @@ def get_vrfs_conf():
     vrfs_conf = CORE_MANAGER.vrfs_conf
     return vrfs_conf.settings
 
-# =============================================================================
+#==============================================================================
 # network configuration related APIs
-# =============================================================================
+#==============================================================================
 
 
 @register(name='network.add')
-def add_network(prefix, next_hop=None):
+def add_network(prefix):
     tm = CORE_MANAGER.get_core_service().table_manager
-    tm.add_to_global_table(prefix, next_hop)
+    tm.add_to_ipv4_global_table(prefix)
     return True
-
-
-@register(name='network.del')
-def del_network(prefix):
-    tm = CORE_MANAGER.get_core_service().table_manager
-    tm.add_to_global_table(prefix, is_withdraw=True)
-    return True
-
-# =============================================================================
-# BMP configuration related APIs
-# =============================================================================
-
-
-@register(name='bmp.start')
-def bmp_start(host, port):
-    core = CORE_MANAGER.get_core_service()
-    return core.start_bmp(host, port)
-
-
-@register(name='bmp.stop')
-def bmp_stop(host, port):
-    core = CORE_MANAGER.get_core_service()
-    return core.stop_bmp(host, port)

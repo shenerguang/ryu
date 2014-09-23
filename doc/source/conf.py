@@ -17,7 +17,6 @@ import sys, os
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('../..'))
-sys.path.insert(0, os.path.abspath('.'))
 
 from ryu import version as ryu_version
 
@@ -215,9 +214,12 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'ryu', u'ryu Documentation',
-     [u'Ryu development team'], 8),
-    ('man/ryu', 'ryu', u'management for Ryu application',
-     [u'Ryu development team'], 8),
-    ('man/ryu_manager', 'ryu-manager', 'management for Ryu application',
-     [u'Ryu development team'], 8),
+     [u'ryu development team'], 1),
+    ('man/neutron_ofagent_agent', 'neutron-ofagent-agent',
+     u'neutron ofagent agent',
+     [u'ryu development team'], 1),
+    ('man/rpc_cli', 'rpc-cli', u'a simple msgpack-rpc client',
+     [u'ryu development team'], 1),
+    ('man/ryu_manager', 'ryu-manager', u'ryu manager',
+     [u'ryu development team'], 1),
 ]

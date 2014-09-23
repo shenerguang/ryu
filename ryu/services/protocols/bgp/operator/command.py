@@ -42,7 +42,7 @@ class Command(object):
     help_msg = ''
     param_help_msg = None
     command = ''
-    cli_resp_line_template = '{0}: {1}\n'
+    cli_resp_line_template = '{0}: {1}\n\n'
 
     def __init__(self, api=None, parent=None,
                  help_formatter=default_help_formatter,
@@ -257,9 +257,8 @@ class TextFilter(object):
                 resp = [resp[key] for key, value in enumerate(resp)
                         if key not in remove]
             else:
-                resp = dict([(key, value)
-                             for key, value in resp.iteritems()
-                             if key not in remove])
+                resp = {key: value for key, value in resp.iteritems()
+                        if key not in remove}
 
             return resp
         else:

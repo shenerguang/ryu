@@ -36,8 +36,7 @@ LOG = logging.getLogger('ryu.app.ofctl_rest')
 
 # REST API
 #
-
-# Retrieve the switch stats
+## Retrieve the switch stats
 #
 # get the list of all switches
 # GET /stats/switches
@@ -47,9 +46,6 @@ LOG = logging.getLogger('ryu.app.ofctl_rest')
 #
 # get flows stats of the switch
 # GET /stats/flow/<dpid>
-#
-# get flows stats of the switch filtered by the fields
-# POST /stats/flow/<dpid>
 #
 # get ports stats of the switch
 # GET /stats/port/<dpid>
@@ -72,10 +68,8 @@ LOG = logging.getLogger('ryu.app.ofctl_rest')
 # get groups stats of the switch
 # GET /stats/group/<dpid>
 #
-# get ports description of the switch
-# GET /stats/portdesc/<dpid>
-
-# Update the switch stats
+#
+## Update the switch stats
 #
 # add a flow entry
 # POST /stats/flowentry/add
@@ -83,14 +77,8 @@ LOG = logging.getLogger('ryu.app.ofctl_rest')
 # modify all matching flow entries
 # POST /stats/flowentry/modify
 #
-# modify flow entry strictly matching wildcards and priority
-# POST /stats/flowentry/modify_strict
-#
 # delete all matching flow entries
 # POST /stats/flowentry/delete
-#
-# delete flow entry strictly matching wildcards and priority
-# POST /stats/flowentry/delete_strict
 #
 # delete all flow entries of the switch
 # DELETE /stats/flowentry/clear/<dpid>
@@ -112,9 +100,6 @@ LOG = logging.getLogger('ryu.app.ofctl_rest')
 #
 # delete a group entry
 # POST /stats/groupentry/delete
-#
-# modify behavior of the physical port
-# POST /stats/portdesc/modify
 #
 #
 # send a experimeter message
@@ -151,25 +136,16 @@ class StatsController(ControllerBase):
         return (Response(content_type='application/json', body=body))
 
     def get_flow_stats(self, req, dpid, **_kwargs):
-        if req.body == '':
-            flow = {}
-        else:
-            try:
-                flow = eval(req.body)
-            except SyntaxError:
-                LOG.debug('invalid syntax %s', req.body)
-                return Response(status=400)
-
         dp = self.dpset.get(int(dpid))
         if dp is None:
             return Response(status=404)
 
         if dp.ofproto.OFP_VERSION == ofproto_v1_0.OFP_VERSION:
-            flows = ofctl_v1_0.get_flow_stats(dp, self.waiters, flow)
+            flows = ofctl_v1_0.get_flow_stats(dp, self.waiters)
         elif dp.ofproto.OFP_VERSION == ofproto_v1_2.OFP_VERSION:
-            flows = ofctl_v1_2.get_flow_stats(dp, self.waiters, flow)
+            flows = ofctl_v1_2.get_flow_stats(dp, self.waiters)
         elif dp.ofproto.OFP_VERSION == ofproto_v1_3.OFP_VERSION:
-            flows = ofctl_v1_3.get_flow_stats(dp, self.waiters, flow)
+            flows = ofctl_v1_3.get_flow_stats(dp, self.waiters)
         else:
             LOG.debug('Unsupported OF protocol')
             return Response(status=501)
@@ -285,24 +261,6 @@ class StatsController(ControllerBase):
         body = json.dumps(groups)
         return Response(content_type='application/json', body=body)
 
-    def get_port_desc(self, req, dpid, **_kwargs):
-        dp = self.dpset.get(int(dpid))
-        if dp is None:
-            return Response(status=404)
-
-        if dp.ofproto.OFP_VERSION == ofproto_v1_0.OFP_VERSION:
-            groups = ofctl_v1_0.get_port_desc(dp, self.waiters)
-        elif dp.ofproto.OFP_VERSION == ofproto_v1_2.OFP_VERSION:
-            groups = ofctl_v1_2.get_port_desc(dp, self.waiters)
-        elif dp.ofproto.OFP_VERSION == ofproto_v1_3.OFP_VERSION:
-            groups = ofctl_v1_3.get_port_desc(dp, self.waiters)
-        else:
-            LOG.debug('Unsupported OF protocol')
-            return Response(status=501)
-
-        body = json.dumps(groups)
-        return Response(content_type='application/json', body=body)
-
     def mod_flow_entry(self, req, cmd, **_kwargs):
         try:
             flow = eval(req.body)
@@ -319,12 +277,8 @@ class StatsController(ControllerBase):
             cmd = dp.ofproto.OFPFC_ADD
         elif cmd == 'modify':
             cmd = dp.ofproto.OFPFC_MODIFY
-        elif cmd == 'modify_strict':
-            cmd = dp.ofproto.OFPFC_MODIFY_STRICT
         elif cmd == 'delete':
             cmd = dp.ofproto.OFPFC_DELETE
-        elif cmd == 'delete_strict':
-            cmd = dp.ofproto.OFPFC_DELETE_STRICT
         else:
             return Response(status=404)
 
@@ -426,47 +380,6 @@ class StatsController(ControllerBase):
 
         return Response(status=200)
 
-    def mod_port_behavior(self, req, cmd, **_kwargs):
-        try:
-            port_config = eval(req.body)
-        except SyntaxError:
-            LOG.debug('invalid syntax %s', req.body)
-            return Response(status=400)
-
-        dpid = port_config.get('dpid')
-
-        port_no = int(port_config.get('port_no', 0))
-        port_info = self.dpset.port_state[int(dpid)].get(port_no)
-
-        if 'hw_addr' not in port_config:
-            if port_info is not None:
-                port_config['hw_addr'] = port_info.hw_addr
-            else:
-                return Response(status=404)
-
-        if 'advertise' not in port_config:
-            if port_info is not None:
-                port_config['advertise'] = port_info.advertised
-            else:
-                return Response(status=404)
-
-        dp = self.dpset.get(int(dpid))
-        if dp is None:
-            return Response(status=404)
-
-        if cmd != 'modify':
-            return Response(status=404)
-
-        if dp.ofproto.OFP_VERSION == ofproto_v1_0.OFP_VERSION:
-            ofctl_v1_0.mod_port_behavior(dp, port_config)
-        elif dp.ofproto.OFP_VERSION == ofproto_v1_2.OFP_VERSION:
-            ofctl_v1_2.mod_port_behavior(dp, port_config)
-        elif dp.ofproto.OFP_VERSION == ofproto_v1_3.OFP_VERSION:
-            ofctl_v1_3.mod_port_behavior(dp, port_config)
-        else:
-            LOG.debug('Unsupported OF protocol')
-            return Response(status=501)
-
     def send_experimenter(self, req, dpid, **_kwargs):
         dp = self.dpset.get(int(dpid))
         if dp is None:
@@ -523,7 +436,7 @@ class RestStatsApi(app_manager.RyuApp):
         uri = path + '/flow/{dpid}'
         mapper.connect('stats', uri,
                        controller=StatsController, action='get_flow_stats',
-                       conditions=dict(method=['GET', 'POST']))
+                       conditions=dict(method=['GET']))
 
         uri = path + '/port/{dpid}'
         mapper.connect('stats', uri,
@@ -560,11 +473,6 @@ class RestStatsApi(app_manager.RyuApp):
                        controller=StatsController, action='get_group_stats',
                        conditions=dict(method=['GET']))
 
-        uri = path + '/portdesc/{dpid}'
-        mapper.connect('stats', uri,
-                       controller=StatsController, action='get_port_desc',
-                       conditions=dict(method=['GET']))
-
         uri = path + '/flowentry/{cmd}'
         mapper.connect('stats', uri,
                        controller=StatsController, action='mod_flow_entry',
@@ -585,11 +493,6 @@ class RestStatsApi(app_manager.RyuApp):
                        controller=StatsController, action='mod_group_entry',
                        conditions=dict(method=['POST']))
 
-        uri = path + '/portdesc/{cmd}'
-        mapper.connect('stats', uri,
-                       controller=StatsController, action='mod_port_behavior',
-                       conditions=dict(method=['POST']))
-
         uri = path + '/experimenter/{dpid}'
         mapper.connect('stats', uri,
                        controller=StatsController, action='send_experimenter',
@@ -604,9 +507,7 @@ class RestStatsApi(app_manager.RyuApp):
                  ofp_event.EventOFPMeterConfigStatsReply,
                  ofp_event.EventOFPGroupStatsReply,
                  ofp_event.EventOFPGroupFeaturesStatsReply,
-                 ofp_event.EventOFPGroupDescStatsReply,
-                 ofp_event.EventOFPPortDescStatsReply
-                 ], MAIN_DISPATCHER)
+                 ofp_event.EventOFPGroupDescStatsReply], MAIN_DISPATCHER)
     def stats_reply_handler(self, ev):
         msg = ev.msg
         dp = msg.datapath
@@ -628,20 +529,5 @@ class RestStatsApi(app_manager.RyuApp):
 
         if msg.flags & flags:
             return
-        del self.waiters[dp.id][msg.xid]
-        lock.set()
-
-    @set_ev_cls([ofp_event.EventOFPSwitchFeatures], MAIN_DISPATCHER)
-    def features_reply_handler(self, ev):
-        msg = ev.msg
-        dp = msg.datapath
-
-        if dp.id not in self.waiters:
-            return
-        if msg.xid not in self.waiters[dp.id]:
-            return
-        lock, msgs = self.waiters[dp.id][msg.xid]
-        msgs.append(msg)
-
         del self.waiters[dp.id][msg.xid]
         lock.set()

@@ -48,26 +48,18 @@ CONF.register_cli_opts([
     cfg.ListOpt('app-lists', default=[],
                 help='application module name to run'),
     cfg.MultiStrOpt('app', positional=True, default=[],
-                    help='application module name to run'),
-    cfg.StrOpt('pid-file', default=None, help='pid file name'),
+                    help='application module name to run')
 ])
 
 
-def main(args=None, prog=None):
+def main():
     try:
-        CONF(args=args, prog=prog,
-             project='ryu', version='ryu-manager %s' % version,
+        CONF(project='ryu', version='ryu-manager %s' % version,
              default_config_files=['/usr/local/etc/ryu/ryu.conf'])
     except cfg.ConfigFilesNotFoundError:
-        CONF(args=args, prog=prog,
-             project='ryu', version='ryu-manager %s' % version)
+        CONF(project='ryu', version='ryu-manager %s' % version)
 
     log.init_log()
-
-    if CONF.pid_file:
-        import os
-        with open(CONF.pid_file, 'w') as pid_file:
-            pid_file.write(str(os.getpid()))
 
     app_lists = CONF.app_lists + CONF.app
     # keep old behaivor, run ofp if no application is specified.

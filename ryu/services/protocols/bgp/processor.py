@@ -18,6 +18,12 @@
 
 import logging
 
+from ryu.services.protocols.bgp.protocols.bgp.nlri import RF_RTC_UC
+from ryu.services.protocols.bgp.protocols.bgp.pathattr import AsPath
+from ryu.services.protocols.bgp.protocols.bgp.pathattr import LocalPref
+from ryu.services.protocols.bgp.protocols.bgp.pathattr import Med
+from ryu.services.protocols.bgp.protocols.bgp.pathattr import Origin
+
 from ryu.services.protocols.bgp.base import Activity
 from ryu.services.protocols.bgp.base import add_bgp_error_metadata
 from ryu.services.protocols.bgp.base import BGP_PROCESSOR_ERROR_CODE
@@ -25,14 +31,6 @@ from ryu.services.protocols.bgp.base import BGPSException
 from ryu.services.protocols.bgp.utils import circlist
 from ryu.services.protocols.bgp.utils.evtlet import EventletIOFactory
 
-from ryu.lib.packet.bgp import RF_RTC_UC
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_AS_PATH
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_LOCAL_PREF
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_MULTI_EXIT_DISC
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_ORIGIN
-from ryu.lib.packet.bgp import BGP_ATTR_ORIGIN_IGP
-from ryu.lib.packet.bgp import BGP_ATTR_ORIGIN_EGP
-from ryu.lib.packet.bgp import BGP_ATTR_ORIGIN_INCOMPLETE
 
 LOG = logging.getLogger('bgpspeaker.processor')
 
@@ -152,16 +150,16 @@ class BgpProcessor(Activity):
         # Wake-up processing thread if sleeping.
         self.dest_que_evt.set()
 
-# =============================================================================
+#==============================================================================
 # Best path computation related utilities.
-# =============================================================================
+#==============================================================================
 
 # Various reasons a path is chosen as best path.
 BPR_UNKNOWN = 'Unknown'
 BPR_ONLY_PATH = 'Only Path'
 BPR_REACHABLE_NEXT_HOP = 'Reachable Next Hop'
 BPR_HIGHEST_WEIGHT = 'Highest Weight'
-BPR_LOCAL_PREF = 'Local Pref'
+BPR_LOCAL_PREF = 'Local Pref.'
 BPR_LOCAL_ORIGIN = 'Local Origin'
 BPR_ASPATH = 'AS Path'
 BPR_ORIGIN = 'Origin'
@@ -291,8 +289,8 @@ def _cmp_by_local_pref(path1, path2):
     # TODO(PH): Revisit this when BGPS has concept of policy to be applied to
     # in-bound NLRIs.
     # Default local-pref values is 100
-    lp1 = path1.get_pattr(BGP_ATTR_TYPE_LOCAL_PREF)
-    lp2 = path2.get_pattr(BGP_ATTR_TYPE_LOCAL_PREF)
+    lp1 = path1.get_pattr(LocalPref.ATTR_NAME)
+    lp2 = path2.get_pattr(LocalPref.ATTR_NAME)
     if not (lp1 and lp2):
         return None
 
@@ -337,8 +335,8 @@ def _cmp_by_aspath(path1, path2):
     Shortest as-path length is preferred. If both path have same lengths,
     we return None.
     """
-    as_path1 = path1.get_pattr(BGP_ATTR_TYPE_AS_PATH)
-    as_path2 = path2.get_pattr(BGP_ATTR_TYPE_AS_PATH)
+    as_path1 = path1.get_pattr(AsPath.ATTR_NAME)
+    as_path2 = path2.get_pattr(AsPath.ATTR_NAME)
     assert as_path1 and as_path2
     l1 = as_path1.get_as_path_len()
     l2 = as_path2.get_as_path_len()
@@ -358,18 +356,18 @@ def _cmp_by_origin(path1, path2):
     If both paths have same origin, we return None.
     """
     def get_origin_pref(origin):
-        if origin.value == BGP_ATTR_ORIGIN_IGP:
+        if origin.value == Origin.IGP:
             return 3
-        elif origin.value == BGP_ATTR_ORIGIN_EGP:
+        elif origin.value == Origin.EGP:
             return 2
-        elif origin.value == BGP_ATTR_ORIGIN_INCOMPLETE:
+        elif origin.value == Origin.INCOMPLETE:
             return 1
         else:
             LOG.error('Invalid origin value encountered %s.' % origin)
             return 0
 
-    origin1 = path1.get_pattr(BGP_ATTR_TYPE_ORIGIN)
-    origin2 = path2.get_pattr(BGP_ATTR_TYPE_ORIGIN)
+    origin1 = path1.get_pattr(Origin.ATTR_NAME)
+    origin2 = path2.get_pattr(Origin.ATTR_NAME)
     assert origin1 is not None and origin2 is not None
 
     # If both paths have same origins
@@ -396,7 +394,7 @@ def _cmp_by_med(path1, path2):
     RFC says lower MED is preferred over higher MED value.
     """
     def get_path_med(path):
-        med = path.get_pattr(BGP_ATTR_TYPE_MULTI_EXIT_DISC)
+        med = path.get_pattr(Med.ATTR_NAME)
         if not med:
             return 0
         return med.value
@@ -466,7 +464,7 @@ def _cmp_by_router_id(local_asn, path1, path2):
         if path_source is None:
             return local_bgp_id
         else:
-            return path_source.protocol.recv_open_msg.bgp_identifier
+            return path_source.protocol.recv_open.bgpid
 
     path_source1 = path1.source
     path_source2 = path2.source
@@ -492,9 +490,9 @@ def _cmp_by_router_id(local_asn, path1, path2):
 
     # At least one path is not coming from NC, so we get local bgp id.
     if path_source1 is not None:
-        local_bgp_id = path_source1.protocol.sent_open_msg.bgp_identifier
+        local_bgp_id = path_source1.protocol.sent_open.bgpid
     else:
-        local_bgp_id = path_source2.protocol.sent_open_msg.bgp_identifier
+        local_bgp_id = path_source2.protocol.sent_open.bgpid
 
     # Get router ids.
     router_id1 = get_router_id(path_source1, local_bgp_id)
@@ -506,8 +504,9 @@ def _cmp_by_router_id(local_asn, path1, path2):
         return None
 
     # Select the path with lowest router Id.
-    from ryu.services.protocols.bgp.utils.bgp import from_inet_ptoi
-    if (from_inet_ptoi(router_id1) < from_inet_ptoi(router_id2)):
+    from ryu.services.protocols.bgp.ker.utils.bgp import from_inet_ptoi
+    if (from_inet_ptoi(router_id1) <
+            from_inet_ptoi(router_id2)):
         return path1
     else:
         return path2

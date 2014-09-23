@@ -15,14 +15,12 @@
 """
   Defines bases classes to create a BGP application.
 """
+import eventlet
 import imp
 import logging
 import traceback
-from os import path
-from oslo.config import cfg
 
 from ryu.lib import hub
-from ryu.base.app_manager import RyuApp
 
 from ryu.services.protocols.bgp.api.base import call
 from ryu.services.protocols.bgp.base import add_bgp_error_metadata
@@ -37,47 +35,36 @@ from ryu.services.protocols.bgp.rtconf.common import \
     DEFAULT_REFRESH_MAX_EOR_TIME
 from ryu.services.protocols.bgp.rtconf.common import \
     DEFAULT_REFRESH_STALEPATH_TIME
-from ryu.services.protocols.bgp.rtconf.common import DEFAULT_LABEL_RANGE
 from ryu.services.protocols.bgp.rtconf.common import LABEL_RANGE
 from ryu.services.protocols.bgp.rtconf.common import LOCAL_AS
 from ryu.services.protocols.bgp.rtconf.common import REFRESH_MAX_EOR_TIME
 from ryu.services.protocols.bgp.rtconf.common import REFRESH_STALEPATH_TIME
 from ryu.services.protocols.bgp.rtconf.common import ROUTER_ID
 from ryu.services.protocols.bgp.rtconf import neighbors
-from ryu.services.protocols.bgp.rtconf import vrfs
 from ryu.services.protocols.bgp.utils.dictconfig import dictConfig
 from ryu.services.protocols.bgp.utils.validation import is_valid_ipv4
-from ryu.services.protocols.bgp.operator import ssh
 
 LOG = logging.getLogger('bgpspeaker.application')
-CONF = cfg.CONF
-
-CONF.register_opts([
-    cfg.IntOpt('bind-port', default=50002, help='rpc-port'),
-    cfg.StrOpt('bind-ip', default='0.0.0.0', help='rpc-bind-ip'),
-    cfg.StrOpt('bgp-config-file', default=None,
-               help='bgp-config-file')
-])
 
 
 @add_bgp_error_metadata(code=BIN_ERROR,
                         sub_code=1,
                         def_desc='Unknown bootstrap exception.')
 class ApplicationException(BGPSException):
-    """Specific Base exception related to `BSPSpeaker`."""
+    """Specific Base exception related to `BaseApplication`."""
     pass
 
 
-class RyuBGPSpeaker(RyuApp):
-    def __init__(self, *args, **kwargs):
-        self.bind_ip = RyuBGPSpeaker.validate_rpc_ip(CONF.bind_ip)
-        self.bind_port = RyuBGPSpeaker.validate_rpc_port(CONF.bind_port)
-        self.config_file = CONF.bgp_config_file
-        super(RyuBGPSpeaker, self).__init__(*args, **kwargs)
+class BaseApplication(object):
+    def __init__(self, bind_ip, bind_port, config_file=None):
+        self.bind_ip = BaseApplication.validate_rpc_ip(bind_ip)
+        self.bind_port = BaseApplication.validate_rpc_port(bind_port)
+        self.config_file = config_file
 
     def start(self):
         # Only two main green threads are required for APGW bgp-agent.
         # One for NetworkController, another for BGPS core.
+        pool = eventlet.GreenPool()
 
         # If configuration file was provided and loaded successfully. We start
         # BGPS core using these settings. If no configuration file is provided
@@ -93,17 +80,14 @@ class RyuBGPSpeaker(RyuApp):
             if getattr(settings, 'BGP', None):
                 self._start_core(settings)
 
-            if getattr(settings, 'SSH', None) is not None:
-                hub.spawn(ssh.SSH_CLI_CONTROLLER.start, None, **settings.SSH)
         # Start Network Controller to server RPC peers.
-        t = hub.spawn(net_ctrl.NET_CONTROLLER.start, *[],
-                      **{net_ctrl.NC_RPC_BIND_IP: self.bind_ip,
+        pool.spawn(net_ctrl.NET_CONTROLLER.start, *[],
+                   **{net_ctrl.NC_RPC_BIND_IP: self.bind_ip,
                       net_ctrl.NC_RPC_BIND_PORT: self.bind_port})
         LOG.debug('Started Network Controller')
 
-        super(RyuBGPSpeaker, self).start()
-
-        return t
+        # Wait for Network Controller and/or BGPS to finish
+        pool.waitall()
 
     @classmethod
     def validate_rpc_ip(cls, ip):
@@ -127,14 +111,14 @@ class RyuBGPSpeaker(RyuApp):
     def load_config(self, config_file):
         """Validates give file as settings file for BGPSpeaker.
 
-        Load the configuration from file as settings module.
+        Load the configuration from file as bgpspeaker.setting module.
         """
         if not config_file or not isinstance(config_file, str):
             raise ApplicationException('Invalid configuration file.')
 
         # Check if file can be read
         try:
-            return imp.load_source('settings', config_file)
+            return imp.load_source('bgpspeaker.settings', config_file)
         except Exception as e:
             raise ApplicationException(desc=str(e))
 
@@ -163,8 +147,9 @@ class RyuBGPSpeaker(RyuApp):
         common_settings[REFRESH_MAX_EOR_TIME] = \
             routing_settings.get(REFRESH_MAX_EOR_TIME,
                                  DEFAULT_REFRESH_MAX_EOR_TIME)
-        common_settings[LABEL_RANGE] = \
-            routing_settings.get(LABEL_RANGE, DEFAULT_LABEL_RANGE)
+        label_range = routing_settings[LABEL_RANGE]
+        if label_range:
+            common_settings[LABEL_RANGE] = label_range
 
         # Start BGPS core service
         waiter = hub.Event()
@@ -207,9 +192,8 @@ class RyuBGPSpeaker(RyuApp):
         All valid VRFs are loaded.
         """
         vpns_conf = routing_settings.setdefault('vpns', {})
-        for vrfname, vrf in vpns_conf.iteritems():
+        for vrf in vpns_conf:
             try:
-                vrf[vrfs.VRF_NAME] = vrfname
                 call('vrf.create', **vrf)
                 LOG.debug('Added vrf  %s' % str(vrf))
             except RuntimeConfigError as e:

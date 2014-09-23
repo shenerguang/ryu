@@ -128,9 +128,7 @@ class RunTest(tester.TestFlowBase):
         self._verify = [dp.ofproto.OFPAT_POP_VLAN, ]
 
         actions = [dp.ofproto_parser.OFPActionPopVlan(), ]
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_vlan_vid(1)
-        self.add_apply_actions(dp, actions, match)
+        self.add_apply_actions(dp, actions)
 
     def test_action_push_mpls(self, dp):
         ethertype = ether.ETH_TYPE_MPLS
@@ -145,9 +143,7 @@ class RunTest(tester.TestFlowBase):
         self._verify = [dp.ofproto.OFPAT_POP_MPLS,
                         'ethertype', ethertype]
         actions = [dp.ofproto_parser.OFPActionPopMpls(ethertype), ]
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_dl_type(ether.ETH_TYPE_MPLS)
-        self.add_apply_actions(dp, actions, match)
+        self.add_apply_actions(dp, actions)
 
     # Test of Set-Filed Actions
     def test_action_set_field_dl_dst(self, dp):
@@ -174,10 +170,7 @@ class RunTest(tester.TestFlowBase):
         field = dp.ofproto.OXM_OF_VLAN_VID
         value = 0x1e4
 
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_vlan_vid(1)
-
-        self.add_set_field_action(dp, field, value, match)
+        self.add_set_field_action(dp, field, value)
 
     def test_action_set_field_vlan_pcp(self, dp):
         field = dp.ofproto.OXM_OF_VLAN_PCP
@@ -342,20 +335,14 @@ class RunTest(tester.TestFlowBase):
         ipv6_src = '7527:c798:c772:4a18:117a:14ff:c1b6:e4ef'
         value = self.ipv6_to_int(ipv6_src)
 
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_dl_type(0x86dd)
-
-        self.add_set_field_action(dp, field, value, match)
+        self.add_set_field_action(dp, field, value)
 
     def test_action_set_field_ipv6_dst(self, dp):
         field = dp.ofproto.OXM_OF_IPV6_DST
         ipv6_dst = '8893:65b3:6b49:3bdb:3d2:9401:866c:c96'
         value = self.ipv6_to_int(ipv6_dst)
 
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_dl_type(0x86dd)
-
-        self.add_set_field_action(dp, field, value, match)
+        self.add_set_field_action(dp, field, value)
 
     def test_action_set_field_ipv6_flabel(self, dp):
         field = dp.ofproto.OXM_OF_IPV6_FLABEL
@@ -420,48 +407,24 @@ class RunTest(tester.TestFlowBase):
         self._verify = [dp.ofproto.OFPAT_SET_MPLS_TTL,
                         'mpls_ttl', mpls_ttl]
         actions = [dp.ofproto_parser.OFPActionSetMplsTtl(mpls_ttl), ]
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_dl_type(ether.ETH_TYPE_MPLS)
-        self.add_apply_actions(dp, actions, match)
+        self.add_apply_actions(dp, actions)
 
     def test_action_dec_mpls_ttl(self, dp):
         self._verify = [dp.ofproto.OFPAT_DEC_MPLS_TTL]
         actions = [dp.ofproto_parser.OFPActionDecMplsTtl(), ]
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_dl_type(ether.ETH_TYPE_MPLS)
-        self.add_apply_actions(dp, actions, match)
+        self.add_apply_actions(dp, actions)
 
-    def test_action_set_nw_ttl_ipv4(self, dp):
+    def test_action_set_nw_ttl(self, dp):
         nw_ttl = 64
         self._verify = [dp.ofproto.OFPAT_SET_NW_TTL,
                         'nw_ttl', nw_ttl]
         actions = [dp.ofproto_parser.OFPActionSetNwTtl(nw_ttl), ]
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_dl_type(0x0800)
-        self.add_apply_actions(dp, actions, match)
+        self.add_apply_actions(dp, actions)
 
-    def test_action_set_nw_ttl_ipv6(self, dp):
-        nw_ttl = 64
-        self._verify = [dp.ofproto.OFPAT_SET_NW_TTL,
-                        'nw_ttl', nw_ttl]
-        actions = [dp.ofproto_parser.OFPActionSetNwTtl(nw_ttl), ]
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_dl_type(0x86dd)
-        self.add_apply_actions(dp, actions, match)
-
-    def test_action_dec_nw_ttl_ipv4(self, dp):
+    def test_action_dec_nw_ttl(self, dp):
         self._verify = [dp.ofproto.OFPAT_DEC_NW_TTL]
         actions = [dp.ofproto_parser.OFPActionDecNwTtl(), ]
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_dl_type(0x0800)
-        self.add_apply_actions(dp, actions, match)
-
-    def test_action_dec_nw_ttl_ipv6(self, dp):
-        self._verify = [dp.ofproto.OFPAT_DEC_NW_TTL]
-        actions = [dp.ofproto_parser.OFPActionDecNwTtl(), ]
-        match = dp.ofproto_parser.OFPMatch()
-        match.set_dl_type(0x86dd)
-        self.add_apply_actions(dp, actions, match)
+        self.add_apply_actions(dp, actions)
 
     def test_action_copy_ttl_out(self, dp):
         self._verify = [dp.ofproto.OFPAT_COPY_TTL_OUT]
@@ -478,15 +441,18 @@ class RunTest(tester.TestFlowBase):
         unsupported = [
             'test_action_set_field_ip_proto',
             'test_action_set_field_dl_type',
+            'test_action_set_field_arp',
+            'test_action_set_field_ipv6',
             'test_action_set_field_icmp',
-            'test_action_set_field_icmpv6_code',
-            'test_action_set_field_icmpv6_type',
-            'test_action_set_field_ipv6_flabel',
-            'test_action_set_field_ipv6_nd_sll',
-            'test_action_set_field_ipv6_nd_target',
-            'test_action_set_field_ipv6_nd_tll',
+            'test_action_set_nw_ttl',
             'test_action_copy_ttl_in',
-            'test_action_copy_ttl_out'
+            'test_action_copy_ttl_out',
+            'test_action_dec_mpls_ttl',
+            'test_action_pop_mpls',
+            'test_action_push_mpls',
+            'test_action_set_field_mpls_label',
+            'test_action_set_field_mpls_tc',
+            'test_action_set_mpls_ttl'
         ]
         for u in unsupported:
             if t.find(u) != -1:

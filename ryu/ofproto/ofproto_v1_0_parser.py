@@ -14,10 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Decoder/Encoder implementations of OpenFlow 1.0.
-"""
-
 import struct
 import binascii
 
@@ -2154,8 +2150,7 @@ class OFPPortMod(MsgBase):
         ]
     }
 
-    def __init__(self, datapath, port_no=0, hw_addr='00:00:00:00:00:00',
-                 config=0, mask=0, advertise=0):
+    def __init__(self, datapath, port_no, hw_addr, config, mask, advertise):
         super(OFPPortMod, self).__init__(datapath)
         self.port_no = port_no
         self.hw_addr = hw_addr

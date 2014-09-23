@@ -42,17 +42,16 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.ofproto import ofproto_v1_3_parser
 
 
-# =============================
+#=============================
 #          REST API
-# =============================
+#=============================
 #
 #  Note: specify switch and vlan group, as follows.
 #   {switch-id} : 'all' or switchID
 #   {vlan-id}   : 'all' or vlanID
 #
 #
-
-# about Firewall status
+## about Firewall status
 #
 # get status of all firewall switches
 # GET /firewall/module/status
@@ -63,8 +62,8 @@ from ryu.ofproto import ofproto_v1_3_parser
 # set disable the firewall switches
 # PUT /firewall/module/disable/{switch-id}
 #
-
-# about Firewall logs
+#
+## about Firewall logs
 #
 # get log status of all firewall switches
 # GET /firewall/log/status
@@ -75,8 +74,8 @@ from ryu.ofproto import ofproto_v1_3_parser
 # set log disable the firewall switches
 # PUT /firewall/log/disable/{switch-id}
 #
-
-# about Firewall rules
+#
+## about Firewall rules
 #
 # get rules of the firewall switches
 # * for no vlan

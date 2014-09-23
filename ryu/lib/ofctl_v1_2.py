@@ -47,6 +47,7 @@ def to_action(dp, dic):
     ofp = dp.ofproto
     parser = dp.ofproto_parser
 
+    result = None
     action_type = dic.get('type')
     if action_type == 'OUTPUT':
         out_port = int(dic.get('port', ofp.OFPP_ANY))
@@ -88,7 +89,7 @@ def to_action(dp, dic):
         value = dic.get('value')
         result = parser.OFPActionSetField(**{field: value})
     else:
-        result = None
+        LOG.debug('Unknown action type: %s' % action_type)
 
     return result
 
@@ -144,7 +145,7 @@ def action_to_str(act):
     elif action_type == ofproto_v1_2.OFPAT_PUSH_MPLS:
         buf = 'PUSH_MPLS:' + str(act.ethertype)
     elif action_type == ofproto_v1_2.OFPAT_POP_MPLS:
-        buf = 'POP_MPLS:' + str(act.ethertype)
+        buf = 'POP_MPLS'
     elif action_type == ofproto_v1_2.OFPAT_SET_QUEUE:
         buf = 'SET_QUEUE:' + str(act.queue_id)
     elif action_type == ofproto_v1_2.OFPAT_GROUP:
@@ -193,8 +194,8 @@ def to_match(dp, attrs):
 
     convert = {'in_port': int,
                'in_phy_port': int,
-               'dl_src': to_match_eth,
-               'dl_dst': to_match_eth,
+               'dl_src': mac.haddr_to_bin,
+               'dl_dst': mac.haddr_to_bin,
                'dl_type': int,
                'dl_vlan': int,
                'vlan_pcp': int,
@@ -205,10 +206,8 @@ def to_match(dp, attrs):
                'nw_proto': int,
                'tp_src': int,
                'tp_dst': int,
-               'mpls_label': int,
-               'metadata': to_match_metadata,
-               'eth_src': to_match_eth,
-               'eth_dst': to_match_eth,
+               'eth_src': mac.haddr_to_bin,
+               'eth_dst': mac.haddr_to_bin,
                'eth_type': int,
                'vlan_vid': int,
                'ipv4_src': to_match_ip,
@@ -225,8 +224,8 @@ def to_match(dp, attrs):
                'arp_op': int,
                'arp_spa': to_match_ip,
                'arp_tpa': to_match_ip,
-               'arp_sha': to_match_eth,
-               'arp_tha': to_match_eth,
+               'arp_sha': mac.haddr_to_bin,
+               'arp_tha': mac.haddr_to_bin,
                'ipv6_src': to_match_ipv6,
                'ipv6_dst': to_match_ipv6,
                'ipv6_flabel': int,
@@ -239,8 +238,8 @@ def to_match(dp, attrs):
 
     match_append = {'in_port': match.set_in_port,
                     'in_phy_port': match.set_in_phy_port,
-                    'dl_src': match.set_dl_src_masked,
-                    'dl_dst': match.set_dl_dst_masked,
+                    'dl_src': match.set_dl_src,
+                    'dl_dst': match.set_dl_dst,
                     'dl_type': match.set_dl_type,
                     'dl_vlan': match.set_vlan_vid,
                     'vlan_pcp': match.set_vlan_pcp,
@@ -249,10 +248,8 @@ def to_match(dp, attrs):
                     'nw_proto': match.set_ip_proto,
                     'tp_src': to_match_tpsrc,
                     'tp_dst': to_match_tpdst,
-                    'mpls_label': match.set_mpls_label,
-                    'metadata': match.set_metadata_masked,
-                    'eth_src': match.set_dl_src_masked,
-                    'eth_dst': match.set_dl_dst_masked,
+                    'eth_src': match.set_dl_src,
+                    'eth_dst': match.set_dl_dst,
                     'eth_type': match.set_dl_type,
                     'vlan_vid': match.set_vlan_vid,
                     'ip_dscp': match.set_ip_dscp,
@@ -271,8 +268,8 @@ def to_match(dp, attrs):
                     'arp_op': match.set_arp_opcode,
                     'arp_spa': match.set_arp_spa_masked,
                     'arp_tpa': match.set_arp_tpa_masked,
-                    'arp_sha': match.set_arp_sha_masked,
-                    'arp_tha': match.set_arp_tha_masked,
+                    'arp_sha': match.set_arp_sha,
+                    'arp_tha': match.set_arp_tha,
                     'ipv6_src': match.set_ipv6_src_masked,
                     'ipv6_dst': match.set_ipv6_dst_masked,
                     'ipv6_flabel': match.set_ipv6_flabel,
@@ -285,10 +282,10 @@ def to_match(dp, attrs):
 
     if attrs.get('dl_type') == ether.ETH_TYPE_ARP or \
             attrs.get('eth_type') == ether.ETH_TYPE_ARP:
-        if 'nw_src' in attrs and 'arp_spa' not in attrs:
+        if 'nw_src' in attrs and not 'arp_spa' in attrs:
             attrs['arp_spa'] = attrs['nw_src']
             del attrs['nw_src']
-        if 'nw_dst' in attrs and 'arp_tpa' not in attrs:
+        if 'nw_dst' in attrs and not 'arp_tpa' in attrs:
             attrs['arp_tpa'] = attrs['nw_dst']
             del attrs['nw_dst']
 
@@ -296,14 +293,7 @@ def to_match(dp, attrs):
         if key in convert:
             value = convert[key](value)
         if key in match_append:
-            if key == 'dl_src' or key == 'dl_dst' or \
-                    key == 'eth_src' or key == 'eth_dst' or \
-                    key == 'arp_sha' or key == 'arp_tha':
-                # MAC address
-                eth = value[0]
-                mask = value[1]
-                match_append[key](eth, mask)
-            elif key == 'nw_src' or key == 'nw_dst' or \
+            if key == 'nw_src' or key == 'nw_dst' or \
                     key == 'ipv4_src' or key == 'ipv4_dst' or \
                     key == 'arp_spa' or key == 'arp_tpa' or \
                     key == 'ipv6_src' or key == 'ipv6_dst':
@@ -311,18 +301,11 @@ def to_match(dp, attrs):
                 ip = value[0]
                 mask = value[1]
                 match_append[key](ip, mask)
-            elif key == 'ipv6_nd_target':
-                match_append[key](value[0])
             elif key == 'tp_src' or key == 'tp_dst' or \
                     key == 'tcp_src' or key == 'tcp_dst' or \
                     key == 'udp_src' or key == 'udp_dst':
                 # tp_src/dst
                 match_append[key](value, match, attrs)
-            elif key == 'metadata':
-                # metadata
-                metadata = value[0]
-                metadata_mask = value[1]
-                match_append[key](metadata, metadata_mask)
             else:
                 # others
                 match_append[key](value)
@@ -330,25 +313,11 @@ def to_match(dp, attrs):
     return match
 
 
-def to_match_eth(value):
-    eth_mask = value.split('/')
-
-    # MAC address
-    eth = mac.haddr_to_bin(eth_mask[0])
-    # mask
-    mask = mac.haddr_to_bin('ff:ff:ff:ff:ff:ff')
-
-    if len(eth_mask) == 2:
-        mask = mac.haddr_to_bin(eth_mask[1])
-
-    return eth, mask
-
-
 def to_match_tpsrc(value, match, rest):
     match_append = {inet.IPPROTO_TCP: match.set_tcp_src,
                     inet.IPPROTO_UDP: match.set_udp_src}
 
-    nw_proto = int(rest.get('nw_proto', rest.get('ip_proto', 0)))
+    nw_proto = rest.get('nw_proto', rest.get('ip_proto', 0))
     if nw_proto in match_append:
         match_append[nw_proto](value)
 
@@ -359,7 +328,7 @@ def to_match_tpdst(value, match, rest):
     match_append = {inet.IPPROTO_TCP: match.set_tcp_dst,
                     inet.IPPROTO_UDP: match.set_udp_dst}
 
-    nw_proto = int(rest.get('nw_proto', rest.get('ip_proto', 0)))
+    nw_proto = rest.get('nw_proto', rest.get('ip_proto', 0))
     if nw_proto in match_append:
         match_append[nw_proto](value)
 
@@ -400,21 +369,11 @@ def to_match_ipv6(value):
     return ipv6, netmask
 
 
-def to_match_metadata(value):
-    if '/' in value:
-        metadata = value.split('/')
-        return str_to_int(metadata[0]), str_to_int(metadata[1])
-    else:
-        return str_to_int(value), ofproto_v1_2_parser.UINT64_MAX
-
-
 def match_to_str(ofmatch):
     keys = {ofproto_v1_2.OXM_OF_IN_PORT: 'in_port',
             ofproto_v1_2.OXM_OF_IN_PHY_PORT: 'in_phy_port',
             ofproto_v1_2.OXM_OF_ETH_SRC: 'dl_src',
             ofproto_v1_2.OXM_OF_ETH_DST: 'dl_dst',
-            ofproto_v1_2.OXM_OF_ETH_SRC_W: 'dl_src',
-            ofproto_v1_2.OXM_OF_ETH_DST_W: 'dl_dst',
             ofproto_v1_2.OXM_OF_ETH_TYPE: 'dl_type',
             ofproto_v1_2.OXM_OF_VLAN_VID: 'dl_vlan',
             ofproto_v1_2.OXM_OF_VLAN_PCP: 'vlan_pcp',
@@ -435,8 +394,6 @@ def match_to_str(ofmatch):
             ofproto_v1_2.OXM_OF_ICMPV4_CODE: 'icmpv4_code',
             ofproto_v1_2.OXM_OF_MPLS_LABEL: 'mpls_label',
             ofproto_v1_2.OXM_OF_MPLS_TC: 'mpls_tc',
-            ofproto_v1_2.OXM_OF_METADATA: 'metadata',
-            ofproto_v1_2.OXM_OF_METADATA_W: 'metadata',
             ofproto_v1_2.OXM_OF_ARP_OP: 'arp_op',
             ofproto_v1_2.OXM_OF_ARP_SPA: 'arp_spa',
             ofproto_v1_2.OXM_OF_ARP_TPA: 'arp_tpa',
@@ -444,8 +401,6 @@ def match_to_str(ofmatch):
             ofproto_v1_2.OXM_OF_ARP_TPA_W: 'arp_tpa',
             ofproto_v1_2.OXM_OF_ARP_SHA: 'arp_sha',
             ofproto_v1_2.OXM_OF_ARP_THA: 'arp_tha',
-            ofproto_v1_2.OXM_OF_ARP_SHA_W: 'arp_sha',
-            ofproto_v1_2.OXM_OF_ARP_THA_W: 'arp_tha',
             ofproto_v1_2.OXM_OF_IPV6_SRC: 'ipv6_src',
             ofproto_v1_2.OXM_OF_IPV6_DST: 'ipv6_dst',
             ofproto_v1_2.OXM_OF_IPV6_SRC_W: 'ipv6_src',
@@ -460,35 +415,18 @@ def match_to_str(ofmatch):
     match = {}
     for match_field in ofmatch.fields:
         key = keys[match_field.header]
-        if key == 'dl_src' or key == 'dl_dst' or key == 'arp_sha' or \
-                key == 'arp_tha':
-            value = match_eth_to_str(match_field.value, match_field.mask)
-        elif key == 'ipv6_nd_tll' or key == 'ipv6_nd_sll':
+        if key == 'dl_src' or key == 'dl_dst':
             value = mac.haddr_to_str(match_field.value)
         elif key == 'nw_src' or key == 'nw_dst' or \
                 key == 'arp_spa' or key == 'arp_tpa':
             value = match_ip_to_str(match_field.value, match_field.mask)
         elif key == 'ipv6_src' or key == 'ipv6_dst':
             value = match_ipv6_to_str(match_field.value, match_field.mask)
-        elif key == 'ipv6_nd_target':
-            value = match_ipv6_to_str(match_field.value, None)
-        elif key == 'metadata':
-            value = ('%d/%d' % (match_field.value, match_field.mask)
-                     if match_field.mask else '%d' % match_field.value)
         else:
             value = match_field.value
         match.setdefault(key, value)
 
     return match
-
-
-def match_eth_to_str(value, mask):
-    eth_str = mac.haddr_to_str(value)
-
-    if mask is not None:
-        eth_str = eth_str + '/' + mac.haddr_to_str(mask)
-
-    return eth_str
 
 
 def match_ip_to_str(value, mask):
@@ -566,33 +504,13 @@ def get_desc_stats(dp, waiters):
     return desc
 
 
-def get_queue_stats(dp, waiters):
-    ofp = dp.ofproto
-    stats = dp.ofproto_parser.OFPQueueStatsRequest(dp, 0, ofp.OFPP_ANY,
-                                                   ofp.OFPQ_ALL)
-    msgs = []
-    send_stats_request(dp, stats, waiters, msgs)
-
-    s = []
-    for msg in msgs:
-        stats = msg.body
-        for stat in stats:
-            s.append({'port_no': stat.port_no,
-                      'queue_id': stat.queue_id,
-                      'tx_bytes': stat.tx_bytes,
-                      'tx_errors': stat.tx_errors,
-                      'tx_packets': stat.tx_packets})
-    desc = {str(dp.id): s}
-    return desc
-
-
-def get_flow_stats(dp, waiters, flow={}):
-    table_id = int(flow.get('table_id', dp.ofproto.OFPTT_ALL))
-    out_port = int(flow.get('out_port', dp.ofproto.OFPP_ANY))
-    out_group = int(flow.get('out_group', dp.ofproto.OFPG_ANY))
-    cookie = int(flow.get('cookie', 0))
-    cookie_mask = int(flow.get('cookie_mask', 0))
-    match = to_match(dp, flow.get('match', {}))
+def get_flow_stats(dp, waiters):
+    table_id = dp.ofproto.OFPTT_ALL
+    out_port = dp.ofproto.OFPP_ANY
+    out_group = dp.ofproto.OFPG_ANY
+    cookie = 0
+    cookie_mask = 0
+    match = dp.ofproto_parser.OFPMatch()
 
     stats = dp.ofproto_parser.OFPFlowStatsRequest(
         dp, table_id, out_port, out_group, cookie, cookie_mask, match)
@@ -615,8 +533,7 @@ def get_flow_stats(dp, waiters, flow={}):
                  'duration_sec': stats.duration_sec,
                  'duration_nsec': stats.duration_nsec,
                  'packet_count': stats.packet_count,
-                 'table_id': stats.table_id,
-                 'length': stats.length}
+                 'table_id': stats.table_id}
             flows.append(s)
     flows = {str(dp.id): flows}
 
@@ -766,33 +683,6 @@ def get_group_desc(dp, waiters):
     return descs
 
 
-def get_port_desc(dp, waiters):
-
-    stats = dp.ofproto_parser.OFPFeaturesRequest(dp)
-    msgs = []
-    send_stats_request(dp, stats, waiters, msgs)
-
-    descs = []
-
-    for msg in msgs:
-        stats = msg.ports
-        for stat in stats.values():
-            d = {'port_no': stat.port_no,
-                 'hw_addr': stat.hw_addr,
-                 'name': stat.name,
-                 'config': stat.config,
-                 'state': stat.state,
-                 'curr': stat.curr,
-                 'advertised': stat.advertised,
-                 'supported': stat.supported,
-                 'peer': stat.peer,
-                 'curr_speed': stat.curr_speed,
-                 'max_speed': stat.max_speed}
-            descs.append(d)
-    descs = {str(dp.id): descs}
-    return descs
-
-
 def mod_flow_entry(dp, flow, cmd):
     cookie = int(flow.get('cookie', 0))
     cookie_mask = int(flow.get('cookie_mask', 0))
@@ -845,19 +735,6 @@ def mod_group_entry(dp, group, cmd):
         dp, cmd, type_, group_id, buckets)
 
     dp.send_msg(group_mod)
-
-
-def mod_port_behavior(dp, port_config):
-    port_no = int(port_config.get('port_no', 0))
-    hw_addr = port_config.get('hw_addr')
-    config = int(port_config.get('config', 0))
-    mask = int(port_config.get('mask', 0))
-    advertise = int(port_config.get('advertise'))
-
-    port_mod = dp.ofproto_parser.OFPPortMod(
-        dp, port_no, hw_addr, config, mask, advertise)
-
-    dp.send_msg(port_mod)
 
 
 def send_experimenter(dp, exp):

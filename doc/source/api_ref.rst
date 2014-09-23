@@ -11,5 +11,5 @@ Ryu API Reference
 .. autoclass:: ryu.base.app_manager.RyuApp
    :members: OFP_VERSIONS,_CONTEXTS,_EVENTS,close,context_iteritems,reply_to_request,send_event,send_event_to_observers,send_request,start
 
-.. autoclass:: ryu.controller.dpset.DPSet
+.. automodule:: ryu.controller.dpset
    :members:

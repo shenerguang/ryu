@@ -8,10 +8,10 @@ from ryu.services.protocols.bgp.operator.command import STATUS_OK
 from ryu.services.protocols.bgp.operator.commands.responses import \
     WrongParamResp
 from ryu.services.protocols.bgp.operator.views.bgp import CoreServiceDetailView
-from ryu.lib.packet.bgp import RF_IPv4_UC
-from ryu.lib.packet.bgp import RF_IPv6_UC
-from ryu.lib.packet.bgp import RF_IPv4_VPN
-from ryu.lib.packet.bgp import RF_IPv6_VPN
+from ryu.services.protocols.bgp.protocols.bgp.nlri import RF_IPv4_UC
+from ryu.services.protocols.bgp.protocols.bgp.nlri import RF_IPv4_VPN
+from ryu.services.protocols.bgp.protocols.bgp.nlri import RF_IPv6_UC
+from ryu.services.protocols.bgp.protocols.bgp.nlri import RF_IPv6_VPN
 
 LOG = logging.getLogger('bgpspeaker.operator.commands.show.summary')
 
@@ -61,10 +61,10 @@ class SentRoutes(Command):
             return WrongParamResp('wrong addr_family name')
 
         ret = self._retrieve_paths(addr_family, rf, ip_addr).encode()
-        ret = dict([
-            (path['nlri']['formatted_nlri'], path)
+        ret = {
+            path['nlri']['formatted_nlri']: path
             for path in ret
-        ])
+        }
 
         return CommandsResponse(STATUS_OK, ret)
 
@@ -133,34 +133,3 @@ class Neighbor(Command):
         'sent-routes': SentRoutes,
         'received-routes': ReceivedRoutes
     }
-
-    fmtstr = ' {0:<12s} {1:<12s} {2:<}\n'
-
-    def action(self, params):
-        core_service = self.api.get_core_service()
-        core_service_view = CoreServiceDetailView(core_service)
-        peers_view = core_service_view.rel('peer_manager').rel('peers')
-
-        ret = peers_view.encode()
-        return CommandsResponse(STATUS_OK,
-                                [{'ip_addr': k,
-                                  'as_num': str(v['remote_as']),
-                                  'bgp_state': v['stats']['bgp_state']}
-                                 for k, v in ret.iteritems()])
-
-    @classmethod
-    def cli_resp_formatter(cls, resp):
-        if resp.status == STATUS_ERROR:
-            return Command.cli_resp_formatter(resp)
-        return cls._format_header() + cls._format_value(resp.value)
-
-    @classmethod
-    def _format_header(cls):
-        return cls.fmtstr.format('IP Address', 'AS Number', 'BGP State')
-
-    @classmethod
-    def _format_value(cls, value):
-        ret = ''
-        for v in value:
-            ret += cls.fmtstr.format(v['ip_addr'], v['as_num'], v['bgp_state'])
-        return ret

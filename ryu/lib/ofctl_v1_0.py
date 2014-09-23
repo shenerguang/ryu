@@ -223,14 +223,11 @@ def get_desc_stats(dp, waiters):
     return desc
 
 
-def get_flow_stats(dp, waiters, flow={}):
-    match = to_match(dp, flow.get('match', {}))
-    table_id = int(flow.get('table_id', 0xff))
-    out_port = int(flow.get('out_port', dp.ofproto.OFPP_NONE))
-
+def get_flow_stats(dp, waiters):
+    match = dp.ofproto_parser.OFPMatch(
+        dp.ofproto.OFPFW_ALL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     stats = dp.ofproto_parser.OFPFlowStatsRequest(
-        dp, 0, match, table_id, out_port)
-
+        dp, 0, match, 0xff, dp.ofproto.OFPP_NONE)
     msgs = []
     send_stats_request(dp, stats, waiters, msgs)
 
@@ -283,37 +280,10 @@ def get_port_stats(dp, waiters):
     return ports
 
 
-def get_port_desc(dp, waiters):
-
-    stats = dp.ofproto_parser.OFPFeaturesRequest(dp)
-    msgs = []
-    send_stats_request(dp, stats, waiters, msgs)
-
-    descs = []
-
-    for msg in msgs:
-        stats = msg.ports
-        for stat in stats.values():
-            d = {'port_no': stat.port_no,
-                 'hw_addr': stat.hw_addr,
-                 'name': stat.name,
-                 'config': stat.config,
-                 'state': stat.state,
-                 'curr': stat.curr,
-                 'advertised': stat.advertised,
-                 'supported': stat.supported,
-                 'peer': stat.peer}
-            descs.append(d)
-    descs = {str(dp.id): descs}
-    return descs
-
-
 def mod_flow_entry(dp, flow, cmd):
     cookie = int(flow.get('cookie', 0))
     priority = int(flow.get('priority',
                             dp.ofproto.OFP_DEFAULT_PRIORITY))
-    buffer_id = int(flow.get('buffer_id', dp.ofproto.OFP_NO_BUFFER))
-    out_port = int(flow.get('out_port', dp.ofproto.OFPP_NONE))
     flags = int(flow.get('flags', 0))
     idle_timeout = int(flow.get('idle_timeout', 0))
     hard_timeout = int(flow.get('hard_timeout', 0))
@@ -323,9 +293,7 @@ def mod_flow_entry(dp, flow, cmd):
     flow_mod = dp.ofproto_parser.OFPFlowMod(
         datapath=dp, match=match, cookie=cookie,
         command=cmd, idle_timeout=idle_timeout,
-        hard_timeout=hard_timeout, priority=priority,
-        buffer_id=buffer_id, out_port=out_port,
-        flags=flags,
+        hard_timeout=hard_timeout, priority=priority, flags=flags,
         actions=actions)
 
     dp.send_msg(flow_mod)
@@ -340,16 +308,3 @@ def delete_flow_entry(dp):
         command=dp.ofproto.OFPFC_DELETE)
 
     dp.send_msg(flow_mod)
-
-
-def mod_port_behavior(dp, port_config):
-    port_no = int(port_config.get('port_no', 0))
-    hw_addr = port_config.get('hw_addr')
-    config = int(port_config.get('config', 0))
-    mask = int(port_config.get('mask', 0))
-    advertise = int(port_config.get('advertise'))
-
-    port_mod = dp.ofproto_parser.OFPPortMod(
-        dp, port_no, hw_addr, config, mask, advertise)
-
-    dp.send_msg(port_mod)

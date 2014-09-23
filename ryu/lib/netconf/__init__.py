@@ -14,10 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-NETCONF definitions used by ryu/lib/of_config.
-"""
-
 import os.path
 
 SCHEMA_DIR = os.path.dirname(__file__)

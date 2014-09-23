@@ -14,10 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-MAC address based isolation logic.
-"""
-
 import logging
 import struct
 

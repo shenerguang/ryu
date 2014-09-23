@@ -60,7 +60,7 @@ class _Base(stringify.StringifyMixin):
             k = _pythonify(e.name)
             try:
                 v = kwargs.pop(k)
-                assert e.name not in kwargs
+                assert not e.name in kwargs
             except KeyError:
                 k = e.name
                 try:
@@ -111,7 +111,7 @@ class _Base(stringify.StringifyMixin):
     @classmethod
     def from_et(cls, et):
         def convert(v):
-            if e.cls is not None:
+            if not e.cls is None:
                 return e.cls.from_et(v)
             return v
 
@@ -130,7 +130,7 @@ class _Base(stringify.StringifyMixin):
                 assert e.is_list
                 v = map(convert, v)
             k = _pythonify(e.name)
-            assert k not in kwargs
+            assert not k in kwargs
             kwargs[k] = v
         return cls(**kwargs)
 

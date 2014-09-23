@@ -20,11 +20,9 @@
 import abc
 import logging
 
-from ryu.lib.packet.bgp import RF_IPv4_UC
-from ryu.lib.packet.bgp import RF_IPv6_UC
-from ryu.lib.packet.bgp import BGPPathAttributeExtendedCommunities
-
+from ryu.services.protocols.bgp.protocols.bgp.pathattr import ExtCommunity
 from ryu.services.protocols.bgp.utils import validation
+
 from ryu.services.protocols.bgp.base import get_validator
 from ryu.services.protocols.bgp.rtconf.base import BaseConf
 from ryu.services.protocols.bgp.rtconf.base import BaseConfListener
@@ -42,6 +40,8 @@ from ryu.services.protocols.bgp.rtconf.base import SITE_OF_ORIGINS
 from ryu.services.protocols.bgp.rtconf.base import validate
 from ryu.services.protocols.bgp.rtconf.base import validate_med
 from ryu.services.protocols.bgp.rtconf.base import validate_soo_list
+from ryu.services.protocols.bgp.protocols.bgp.nlri import RF_IPv4_UC
+from ryu.services.protocols.bgp.protocols.bgp.nlri import RF_IPv6_UC
 
 
 LOG = logging.getLogger('bgpspeaker.rtconf.vrfs')
@@ -73,8 +73,11 @@ def validate_import_rts(import_rts):
     if not (len(import_rts) <= MAX_NUM_IMPORT_RT):
         raise ConfigValueError(desc='Max. import RT is limited to %s' %
                                MAX_NUM_IMPORT_RT)
-    if not all(validation.is_valid_ext_comm_attr(rt) for rt in import_rts):
-        raise ConfigValueError(conf_name=IMPORT_RTS, conf_value=import_rts)
+    try:
+        ExtCommunity.validate_supported_attributes(import_rts)
+    except ValueError:
+        raise ConfigValueError(conf_name=IMPORT_RTS,
+                               conf_value=import_rts)
     # Check if we have duplicates
     unique_rts = set(import_rts)
     if len(unique_rts) != len(import_rts):
@@ -91,8 +94,9 @@ def validate_export_rts(export_rts):
     if not (len(export_rts) <= MAX_NUM_EXPORT_RT):
         raise ConfigValueError(desc='Max. import RT is limited to %s' %
                                MAX_NUM_EXPORT_RT)
-
-    if not all(validation.is_valid_ext_comm_attr(rt) for rt in export_rts):
+    try:
+        ExtCommunity.validate_supported_attributes(export_rts)
+    except Exception:
         raise ConfigValueError(conf_name=EXPORT_RTS, conf_value=export_rts)
     # Check if we have duplicates
     unique_rts = set(export_rts)
@@ -103,11 +107,15 @@ def validate_export_rts(export_rts):
 
 
 @validate(name=ROUTE_DISTINGUISHER)
-def validate_rd(route_dist):
-    if not validation.is_valid_route_dist(route_dist):
+def valdiate_rd(route_disc):
+    if not isinstance(route_disc, str):
+        raise ConfigTypeError(conf_name=ROUTE_DISTINGUISHER,
+                              conf_value=route_disc)
+
+    if not validation.is_valid_route_disc(route_disc):
         raise ConfigValueError(conf_name=ROUTE_DISTINGUISHER,
-                               conf_value=route_dist)
-    return route_dist
+                               conf_value=route_disc)
+    return route_disc
 
 
 @validate(name=VRF_RF)
@@ -130,7 +138,7 @@ class VrfConf(ConfWithId, ConfWithStats):
                                    EXPORT_RTS])
 
     OPTIONAL_SETTINGS = frozenset(
-        [VRF_NAME, MULTI_EXIT_DISC, SITE_OF_ORIGINS, VRF_RF, IMPORT_MAPS]
+        [MULTI_EXIT_DISC, SITE_OF_ORIGINS, VRF_RF, IMPORT_MAPS]
     )
 
     def __init__(self, **kwargs):
@@ -161,17 +169,17 @@ class VrfConf(ConfWithId, ConfWithStats):
         import_maps = kwargs.pop(IMPORT_MAPS, [])
         self._settings[IMPORT_MAPS] = import_maps
 
-    # =========================================================================
+    #==========================================================================
     # Required attributes
-    # =========================================================================
+    #==========================================================================
 
     @property
     def route_dist(self):
         return self._settings[ROUTE_DISTINGUISHER]
 
-    # =========================================================================
+    #==========================================================================
     # Optional attributes with valid defaults.
-    # =========================================================================
+    #==========================================================================
 
     @property
     def import_rts(self):

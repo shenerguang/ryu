@@ -1,13 +1,10 @@
 import logging
-import netaddr
 from collections import OrderedDict
 
 from ryu.services.protocols.bgp.base import SUPPORTED_GLOBAL_RF
 from ryu.services.protocols.bgp.info_base.rtc import RtcTable
 from ryu.services.protocols.bgp.info_base.ipv4 import Ipv4Path
 from ryu.services.protocols.bgp.info_base.ipv4 import Ipv4Table
-from ryu.services.protocols.bgp.info_base.ipv6 import Ipv6Path
-from ryu.services.protocols.bgp.info_base.ipv6 import Ipv6Table
 from ryu.services.protocols.bgp.info_base.vpnv4 import Vpnv4Path
 from ryu.services.protocols.bgp.info_base.vpnv4 import Vpnv4Table
 from ryu.services.protocols.bgp.info_base.vpnv6 import Vpnv6Path
@@ -17,20 +14,8 @@ from ryu.services.protocols.bgp.info_base.vrf6 import Vrf6Table
 from ryu.services.protocols.bgp.rtconf import vrfs
 from ryu.services.protocols.bgp.rtconf.vrfs import VRF_RF_IPV4
 from ryu.services.protocols.bgp.rtconf.vrfs import VRF_RF_IPV6
-
-from ryu.lib.packet.bgp import RF_IPv4_UC
-from ryu.lib.packet.bgp import RF_IPv6_UC
-from ryu.lib.packet.bgp import RF_IPv4_VPN
-from ryu.lib.packet.bgp import RF_IPv6_VPN
-from ryu.lib.packet.bgp import RF_RTC_UC
-from ryu.lib.packet.bgp import BGPPathAttributeOrigin
-from ryu.lib.packet.bgp import BGPPathAttributeAsPath
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_ORIGIN
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_AS_PATH
-from ryu.lib.packet.bgp import BGP_ATTR_ORIGIN_IGP
-from ryu.lib.packet.bgp import IPAddrPrefix
-from ryu.lib.packet.bgp import IP6AddrPrefix
-
+from ryu.services.protocols.bgp.protocols.bgp import pathattr
+from ryu.services.protocols.bgp.protocols.bgp import nlri
 from ryu.services.protocols.bgp.utils.validation import is_valid_ipv4
 from ryu.services.protocols.bgp.utils.validation import is_valid_ipv4_prefix
 from ryu.services.protocols.bgp.utils.validation import is_valid_ipv6
@@ -165,17 +150,16 @@ class TableCoreManager(object):
             )
 
         global_table = None
-        if route_family == RF_IPv4_UC:
+        if route_family == nlri.RF_IPv4_UC:
             global_table = self.get_ipv4_table()
-        elif route_family == RF_IPv6_UC:
-            global_table = self.get_ipv6_table()
-        elif route_family == RF_IPv4_VPN:
+
+        elif route_family == nlri.RF_IPv4_VPN:
             global_table = self.get_vpn4_table()
 
-        elif route_family == RF_IPv6_VPN:
+        elif route_family == nlri.RF_IPv6_VPN:
             global_table = self.get_vpn6_table()
 
-        elif route_family == RF_RTC_UC:
+        elif route_family == nlri.RF_RTC_UC:
             global_table = self.get_rtc_table()
 
         return global_table
@@ -200,34 +184,26 @@ class TableCoreManager(object):
         Creates the table if it does not exist.
         """
 
-        vpn_table = self._global_tables.get(RF_IPv4_UC)
+        vpn_table = self._global_tables.get(nlri.RF_IPv4_UC)
         # Lazy initialize the table.
         if not vpn_table:
             vpn_table = Ipv4Table(self._core_service, self._signal_bus)
-            self._global_tables[RF_IPv4_UC] = vpn_table
-            self._tables[(None, RF_IPv4_UC)] = vpn_table
+            self._global_tables[nlri.RF_IPv4_UC] = vpn_table
+            self._tables[(None, nlri.RF_IPv4_UC)] = vpn_table
 
         return vpn_table
-
-    def get_ipv6_table(self):
-        table = self._global_tables.get(RF_IPv6_UC)
-        if not table:
-            table = Ipv6Table(self._core_service, self._signal_bus)
-            self._global_tables[RF_IPv6_UC] = table
-            self._tables[(None, RF_IPv6_UC)] = table
-        return table
 
     def get_vpn6_table(self):
         """Returns global VPNv6 table.
 
         Creates the table if it does not exist.
         """
-        vpn_table = self._global_tables.get(RF_IPv6_VPN)
+        vpn_table = self._global_tables.get(nlri.RF_IPv6_VPN)
         # Lazy initialize the table.
         if not vpn_table:
             vpn_table = Vpnv6Table(self._core_service, self._signal_bus)
-            self._global_tables[RF_IPv6_VPN] = vpn_table
-            self._tables[(None, RF_IPv6_VPN)] = vpn_table
+            self._global_tables[nlri.RF_IPv6_VPN] = vpn_table
+            self._tables[(None, nlri.RF_IPv6_VPN)] = vpn_table
 
         return vpn_table
 
@@ -236,12 +212,12 @@ class TableCoreManager(object):
 
         Creates the table if it does not exist.
         """
-        vpn_table = self._global_tables.get(RF_IPv4_VPN)
+        vpn_table = self._global_tables.get(nlri.RF_IPv4_VPN)
         # Lazy initialize the table.
         if not vpn_table:
             vpn_table = Vpnv4Table(self._core_service, self._signal_bus)
-            self._global_tables[RF_IPv4_VPN] = vpn_table
-            self._tables[(None, RF_IPv4_VPN)] = vpn_table
+            self._global_tables[nlri.RF_IPv4_VPN] = vpn_table
+            self._tables[(None, nlri.RF_IPv4_VPN)] = vpn_table
 
         return vpn_table
 
@@ -250,12 +226,12 @@ class TableCoreManager(object):
 
         Creates the table if it does not exist.
         """
-        rtc_table = self._global_tables.get(RF_RTC_UC)
+        rtc_table = self._global_tables.get(nlri.RF_RTC_UC)
         # Lazy initialization of the table.
         if not rtc_table:
             rtc_table = RtcTable(self._core_service, self._signal_bus)
-            self._global_tables[RF_RTC_UC] = rtc_table
-            self._tables[(None, RF_RTC_UC)] = rtc_table
+            self._global_tables[nlri.RF_RTC_UC] = rtc_table
+            self._tables[(None, nlri.RF_RTC_UC)] = rtc_table
         return rtc_table
 
     def get_next_vpnv4_label(self):
@@ -400,10 +376,10 @@ class TableCoreManager(object):
         interested_rts = self._rt_mgr.global_interested_rts
         LOG.debug('Cleaning uninteresting paths. Global interested RTs %s' %
                   interested_rts)
-        for route_family in [RF_IPv4_VPN, RF_IPv6_VPN, RF_RTC_UC]:
+        for route_family in SUPPORTED_GLOBAL_RF:
             # TODO(PH): We currently do not install RT_NLRI paths based on
             # extended path attributes (RT)
-            if route_family == RF_RTC_UC:
+            if route_family == nlri.RF_RTC_UC:
                 continue
             table = self.get_global_table_by_route_family(route_family)
             uninteresting_dest_count += \
@@ -431,9 +407,9 @@ class TableCoreManager(object):
         interested_tables = set()
 
         # Get route family of VRF to when this VPN Path can be imported to
-        route_family = RF_IPv4_UC
-        if vpn_path.route_family != RF_IPv4_VPN:
-            route_family = RF_IPv6_UC
+        route_family = nlri.RF_IPv4_UC
+        if vpn_path.route_family != nlri.RF_IPv4_VPN:
+            route_family = nlri.RF_IPv6_UC
         for rt in path_rts:
             rt_rf_id = rt + ':' + str(route_family)
             vrf_rt_tables = self._tables_for_rt.get(rt_rf_id)
@@ -443,10 +419,10 @@ class TableCoreManager(object):
         if interested_tables:
             # We iterate over all VRF tables that are interested in the RT
             # of the given path and import this path into them.
-            route_dist = vpn_path.nlri.route_dist
+            route_disc = vpn_path.nlri.route_disc
             for vrf_table in interested_tables:
                 if not (vpn_path.source is None
-                        and route_dist == vrf_table.vrf_conf.route_dist):
+                        and route_disc == vrf_table.vrf_conf.route_dist):
                     update_vrf_dest = vrf_table.import_vpn_path(vpn_path)
                     # Queue the destination for further processing.
                     if update_vrf_dest is not None:
@@ -478,8 +454,7 @@ class TableCoreManager(object):
                                         'exist.' % route_dist)
             if not is_valid_ipv4_prefix(prefix) or not is_valid_ipv4(next_hop):
                 raise BgpCoreError(desc='Invalid Ipv4 prefix or nexthop.')
-            ip, masklen = prefix.split('/')
-            prefix = IPAddrPrefix(int(masklen), ip)
+            prefix = nlri.Ipv4(prefix)
         elif route_family == VRF_RF_IPV6:
             vrf_table = self._tables.get(table_id)
             if vrf_table is None:
@@ -487,44 +462,27 @@ class TableCoreManager(object):
                                         'exist.' % route_dist)
             if not is_valid_ipv6_prefix(prefix) or not is_valid_ipv6(next_hop):
                 raise BgpCoreError(desc='Invalid Ipv6 prefix or nexthop.')
-            ip6, masklen = prefix.split('/')
-            prefix = IP6AddrPrefix(int(masklen), ip6)
-
+            prefix = nlri.Ipv6(prefix)
         return vrf_table.insert_vrf_path(
             prefix, next_hop=next_hop,
             gen_lbl=True
         )
 
-    def add_to_global_table(self, prefix, nexthop=None,
-                            is_withdraw=False):
+    def add_to_ipv4_global_table(self, prefix):
+        _nlri = nlri.Ipv4(prefix)
         src_ver_num = 1
         peer = None
         # set mandatory path attributes
-        origin = BGPPathAttributeOrigin(BGP_ATTR_ORIGIN_IGP)
-        aspath = BGPPathAttributeAsPath([[]])
+        nexthop = pathattr.NextHop("0.0.0.0")
+        origin = pathattr.Origin('igp')
+        aspath = pathattr.AsPath([[]])
 
         pathattrs = OrderedDict()
-        pathattrs[BGP_ATTR_TYPE_ORIGIN] = origin
-        pathattrs[BGP_ATTR_TYPE_AS_PATH] = aspath
+        pathattrs[origin.ATTR_NAME] = origin
+        pathattrs[aspath.ATTR_NAME] = aspath
 
-        net = netaddr.IPNetwork(prefix)
-        ip = str(net.ip)
-        masklen = net.prefixlen
-        if netaddr.valid_ipv4(ip):
-            _nlri = IPAddrPrefix(masklen, ip)
-            if nexthop is None:
-                nexthop = '0.0.0.0'
-            p = Ipv4Path
-        else:
-            _nlri = IP6AddrPrefix(masklen, ip)
-            if nexthop is None:
-                nexthop = '::'
-            p = Ipv6Path
-
-        new_path = p(peer, _nlri, src_ver_num,
-                     pattrs=pathattrs, nexthop=nexthop,
-                     is_withdraw=is_withdraw)
-
+        new_path = Ipv4Path(peer, _nlri, src_ver_num,
+                            pattrs=pathattrs, nexthop=nexthop)
         # add to global ipv4 table and propagates to neighbors
         self.learn_path(new_path)
 
@@ -552,15 +510,13 @@ class TableCoreManager(object):
             if not vrf_table:
                 raise BgpCoreError(desc='Vrf for route distinguisher %s does '
                                         'not exist.' % route_dist)
-            ip, masklen = prefix.split('/')
-            prefix = IPAddrPrefix(int(masklen), ip)
+            prefix = nlri.Ipv4(prefix)
         else:
             vrf_table = self._tables.get(table_id)
             if not vrf_table:
                 raise BgpCoreError(desc='Vrf for route distinguisher %s does '
                                         'not exist.' % route_dist)
-            ip6, masklen = prefix.split('/')
-            prefix = IP6AddrPrefix(int(masklen), ip6)
+            prefix = nlri.Ipv6(prefix)
             # We do not check if we have a path to given prefix, we issue
         # withdrawal. Hence multiple withdrawals have not side effect.
         return vrf_table.insert_vrf_path(prefix, is_withdraw=True)

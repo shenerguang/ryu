@@ -1,7 +1,6 @@
 from ryu.services.protocols.bgp.operator.command import Command
 from ryu.services.protocols.bgp.operator.command import CommandsResponse
 from ryu.services.protocols.bgp.operator.command import STATUS_OK
-from ryu.services.protocols.bgp.operator.command import STATUS_ERROR
 from ryu.services.protocols.bgp.operator.commands.show import count
 from ryu.services.protocols.bgp.operator.commands.show import importmap
 from ryu.services.protocols.bgp.operator.commands.show import memory
@@ -27,7 +26,7 @@ class ShowCmd(Command):
         }
 
     def action(self, params):
-        return CommandsResponse(STATUS_ERROR, 'Command incomplete')
+        return CommandsResponse(STATUS_OK, None)
 
     class Count(count.Count):
         pass
@@ -52,10 +51,6 @@ class ShowCmd(Command):
         help_msg = 'shows if logging is on/off and current logging level.'
 
         def action(self, params):
-            if self.api.check_logging():
-                ret = {'logging': self.api.check_logging(),
-                       'level': self.api.check_logging_level()}
-            else:
-                ret = {'logging': self.api.check_logging(),
-                       'level': None}
+            ret = {'logging': self.api.check_logging(),
+                   'level': self.api.check_logging_level()}
             return CommandsResponse(STATUS_OK, ret)

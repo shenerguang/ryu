@@ -44,11 +44,7 @@ class Test_bgp(unittest.TestCase):
     def test_open2(self):
         opt_param = [bgp.BGPOptParamCapabilityUnknown(cap_code=200,
                                                       cap_value='hoge'),
-                     bgp.BGPOptParamCapabilityGracefulRestart(flags=0,
-                                                              time=120,
-                                                              tuples=[]),
                      bgp.BGPOptParamCapabilityRouteRefresh(),
-                     bgp.BGPOptParamCapabilityCiscoRouteRefresh(),
                      bgp.BGPOptParamCapabilityMultiprotocol(
                          afi=afi.IP, safi=safi.MPLS_VPN),
                      bgp.BGPOptParamCapabilityCarryingLabelInfo(),
@@ -84,27 +80,30 @@ class Test_bgp(unittest.TestCase):
                                                   addr='192.0.2.13')]
         mp_nlri = [
             bgp.LabelledVPNIPAddrPrefix(24, '192.0.9.0',
-                                        route_dist='100:100',
+                                        route_dist=100,
                                         labels=[1, 2, 3]),
             bgp.LabelledVPNIPAddrPrefix(26, '192.0.10.192',
-                                        route_dist='10.0.0.1:10000',
+                                        route_dist=4000000000,
                                         labels=[5, 6, 7, 8]),
-        ]
-        mp_nlri2 = [
-            bgp.LabelledIPAddrPrefix(24, '192.168.0.0', labels=[1, 2, 3])
         ]
         communities = [
             bgp.BGP_COMMUNITY_NO_EXPORT,
             bgp.BGP_COMMUNITY_NO_ADVERTISE,
         ]
         ecommunities = [
-            bgp.BGPTwoOctetAsSpecificExtendedCommunity(
-                subtype=1, as_number=65500, local_administrator=3908876543),
-            bgp.BGPFourOctetAsSpecificExtendedCommunity(
-                subtype=2, as_number=10000000, local_administrator=59876),
-            bgp.BGPIPv4AddressSpecificExtendedCommunity(
-                subtype=3, ipv4_address='192.0.2.1',
-                local_administrator=65432),
+            bgp.BGPTwoOctetAsSpecificExtendedCommunity(subtype=1,
+                                                       as_number=65500,
+                                                       local_administrator=
+                                                       3908876543),
+            bgp.BGPFourOctetAsSpecificExtendedCommunity(subtype=2,
+                                                        as_number=10000000,
+                                                        local_administrator=
+                                                        59876),
+            bgp.BGPIPv4AddressSpecificExtendedCommunity(subtype=3,
+                                                        ipv4_address=
+                                                        '192.0.2.1',
+                                                        local_administrator=
+                                                        65432),
             bgp.BGPOpaqueExtendedCommunity(opaque='abcdefg'),
             bgp.BGPUnknownExtendedCommunity(type_=99, value='abcdefg'),
         ]
@@ -119,22 +118,17 @@ class Test_bgp(unittest.TestCase):
             bgp.BGPPathAttributeAggregator(as_number=40000,
                                            addr='192.0.2.99'),
             bgp.BGPPathAttributeCommunities(communities=communities),
-            bgp.BGPPathAttributeOriginatorId(value='10.1.1.1'),
-            bgp.BGPPathAttributeClusterList(value=['1.1.1.1', '2.2.2.2']),
             bgp.BGPPathAttributeExtendedCommunities(communities=ecommunities),
             bgp.BGPPathAttributeAs4Path(value=[[1000000], set([1000001, 1002]),
                                                [1003, 1000004]]),
             bgp.BGPPathAttributeAs4Aggregator(as_number=100040000,
                                               addr='192.0.2.99'),
             bgp.BGPPathAttributeMpReachNLRI(afi=afi.IP, safi=safi.MPLS_VPN,
-                                            next_hop='1.1.1.1',
+                                            next_hop='abcd',
                                             nlri=mp_nlri),
-            bgp.BGPPathAttributeMpReachNLRI(afi=afi.IP, safi=safi.MPLS_LABEL,
-                                            next_hop='1.1.1.1',
-                                            nlri=mp_nlri2),
             bgp.BGPPathAttributeMpUnreachNLRI(afi=afi.IP, safi=safi.MPLS_VPN,
                                               withdrawn_routes=mp_nlri),
-            bgp.BGPPathAttributeUnknown(flags=0, type_=100, value=300 * 'bar')
+            bgp.BGPPathAttributeUnknown(flags=0, type_=100, value=300*'bar')
         ]
         nlri = [
             bgp.BGPNLRI(length=24, addr='203.0.113.1'),
@@ -235,10 +229,10 @@ class Test_bgp(unittest.TestCase):
                                                   addr='192.0.2.13')]
         mp_nlri = [
             bgp.LabelledVPNIPAddrPrefix(24, '192.0.9.0',
-                                        route_dist='100:100',
+                                        route_dist=100,
                                         labels=[1, 2, 3]),
             bgp.LabelledVPNIPAddrPrefix(26, '192.0.10.192',
-                                        route_dist='10.0.0.1:10000',
+                                        route_dist=4000000000,
                                         labels=[5, 6, 7, 8]),
         ]
         communities = [
@@ -246,13 +240,19 @@ class Test_bgp(unittest.TestCase):
             bgp.BGP_COMMUNITY_NO_ADVERTISE,
         ]
         ecommunities = [
-            bgp.BGPTwoOctetAsSpecificExtendedCommunity(
-                subtype=1, as_number=65500, local_administrator=3908876543),
-            bgp.BGPFourOctetAsSpecificExtendedCommunity(
-                subtype=2, as_number=10000000, local_administrator=59876),
-            bgp.BGPIPv4AddressSpecificExtendedCommunity(
-                subtype=3, ipv4_address='192.0.2.1',
-                local_administrator=65432),
+            bgp.BGPTwoOctetAsSpecificExtendedCommunity(subtype=1,
+                                                       as_number=65500,
+                                                       local_administrator=
+                                                       3908876543),
+            bgp.BGPFourOctetAsSpecificExtendedCommunity(subtype=2,
+                                                        as_number=10000000,
+                                                        local_administrator=
+                                                        59876),
+            bgp.BGPIPv4AddressSpecificExtendedCommunity(subtype=3,
+                                                        ipv4_address=
+                                                        '192.0.2.1',
+                                                        local_administrator=
+                                                        65432),
             bgp.BGPOpaqueExtendedCommunity(opaque='abcdefg'),
             bgp.BGPUnknownExtendedCommunity(type_=99, value='abcdefg'),
         ]
@@ -273,11 +273,11 @@ class Test_bgp(unittest.TestCase):
             bgp.BGPPathAttributeAs4Aggregator(as_number=100040000,
                                               addr='192.0.2.99'),
             bgp.BGPPathAttributeMpReachNLRI(afi=afi.IP, safi=safi.MPLS_VPN,
-                                            next_hop='1.1.1.1',
+                                            next_hop='abcd',
                                             nlri=mp_nlri),
             bgp.BGPPathAttributeMpUnreachNLRI(afi=afi.IP, safi=safi.MPLS_VPN,
                                               withdrawn_routes=mp_nlri),
-            bgp.BGPPathAttributeUnknown(flags=0, type_=100, value=300 * 'bar')
+            bgp.BGPPathAttributeUnknown(flags=0, type_=100, value=300*'bar')
         ]
         nlri = [
             bgp.BGPNLRI(length=24, addr='203.0.113.1'),

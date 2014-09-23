@@ -235,9 +235,7 @@ Multipart Messages
 
     JSON Example:
 
-       See an example in:
-
-       ``ryu/tests/unit/ofproto/json/of13/4-56-ofp_table_features_reply.packet.json``
+    .. literalinclude:: ../../ryu/tests/unit/ofproto/json/of13/4-56-ofp_table_features_reply.packet.json
 
 Queue Configuration Messages
 ----------------------------

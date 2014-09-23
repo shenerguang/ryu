@@ -5,30 +5,25 @@ from ryu.services.protocols.bgp.operator.views.base import \
 from ryu.services.protocols.bgp.operator.views.base import OperatorDetailView
 from ryu.services.protocols.bgp.operator.views import fields
 
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_AS_PATH
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_ORIGIN
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_MULTI_EXIT_DISC
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_LOCAL_PREF
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_EXTENDED_COMMUNITIES
+from ryu.services.protocols.bgp.protocols.bgp import pathattr
 
 
 class CoreServiceDetailView(OperatorDetailView):
     rf_state = fields.RelatedViewField(
         'rf_state',
-        'ryu.services.protocols.bgp.operator.views.bgp.RfStateDetailView'
+        'bgpspeaker.operator.views.bgp.RfStateDetailView'
     )
     importmap_manager = fields.RelatedDictViewField(
         '_importmap_manager',
-        'ryu.services.protocols.bgp.operator'
-        '.views.other.ImportmapManagerDetailView'
+        'bgpspeaker.operator.views.other.ImportmapManagerDetailView'
     )
     table_manager = fields.RelatedViewField(
         '_table_manager',
-        'ryu.services.protocols.bgp.operator.views.bgp.TableManagerDetailView'
+        'bgpspeaker.operator.views.bgp.TableManagerDetailView'
     )
     peer_manager = fields.RelatedViewField(
         '_peer_manager',
-        'ryu.services.protocols.bgp.operator.views.bgp.PeerManagerDetailView'
+        'bgpspeaker.operator.views.bgp.PeerManagerDetailView'
     )
     router_id = fields.DataField('router_id')
 
@@ -36,15 +31,15 @@ class CoreServiceDetailView(OperatorDetailView):
 class TableManagerDetailView(OperatorDetailView):
     tables = fields.RelatedDictViewField(
         '_tables',
-        'ryu.services.protocols.bgp.operator.views.bgp.TableDictView'
+        'bgpspeaker.operator.views.bgp.TableDictView'
     )
     tables_for_rt = fields.RelatedDictViewField(
         '_tables_for_rt',
-        'ryu.services.protocols.bgp.operator.views.bgp.TableDictView'
+        'bgpspeaker.operator.views.bgp.TableDictView'
     )
     global_tables = fields.RelatedDictViewField(
         '_global_tables',
-        'ryu.services.protocols.bgp.operator.views.bgp.TableDictView'
+        'bgpspeaker.operator.views.bgp.TableDictView'
     )
     asbr_label_range = fields.DataField('_asbr_label_range')
     next_hop_label = fields.DataField('_next_hop_label')
@@ -54,11 +49,11 @@ class TableManagerDetailView(OperatorDetailView):
 class PeerManagerDetailView(OperatorDetailView):
     peers = fields.RelatedListViewField(
         '_peers',
-        'ryu.services.protocols.bgp.operator.views.bgp.PeerDictView'
+        'bgpspeaker.operator.views.bgp.PeerDictView'
     )
     peers_summary = fields.RelatedListViewField(
         '_peers',
-        'ryu.services.protocols.bgp.operator.views.bgp.PeerDictSummaryView'
+        'bgpspeaker.operator.views.bgp.PeerDictSummaryView'
     )
 
 
@@ -82,15 +77,15 @@ class PeerDetailView(OperatorDetailView):
     enabled = fields.DataField('enabled')
     neigh_conf = fields.RelatedViewField(
         '_neigh_conf',
-        'ryu.services.protocols.bgp.operator.views.conf.ConfDetailView'
+        'bgpspeaker.operator.views.conf.ConfDetailView'
     )
     common_conf = fields.RelatedViewField(
         '_common_conf',
-        'ryu.services.protocols.bgp.operator.views.conf.ConfDetailView'
+        'bgpspeaker.operator.views.conf.ConfDetailView'
     )
     state = fields.RelatedViewField(
         'state',
-        'ryu.services.protocols.bgp.operator.views.bgp.PeerStateDetailView'
+        'bgpspeaker.operator.views.bgp.PeerStateDetailView'
     )
 
     def encode(self):
@@ -115,7 +110,7 @@ class PeerRfDetailView(OperatorDetailView):
     enabled = fields.DataField('enabled')
     peer = fields.RelatedViewField(
         'peer',
-        'ryu.services.protocols.bgp.operator.views.bgp.PeerDetailView'
+        'bgpspeaker.operator.views.bgp.PeerDetailView'
     )
 
 
@@ -124,45 +119,43 @@ class TableDetailView(OperatorDetailView):
     route_family = fields.DataField('route_family')
     destinations = fields.RelatedDictViewField(
         '_destinations',
-        'ryu.services.protocols.bgp.operator.views.bgp.DestinationDictView'
+        'bgpspeaker.operator.views.bgp.DestinationDictView'
     )
 
 
 class PathDetailView(OperatorDetailView):
     source_version_num = fields.DataField('source_version_num')
     route_family = fields.RelatedViewField(
-        'route_family',
-        'ryu.services.protocols.bgp.operator.views.bgp.RouteFamilyView'
+        'route_family', 'bgpspeaker.operator.views.bgp.RouteFamilyView'
     )
     nlri = fields.RelatedViewField(
         'nlri',
-        'ryu.services.protocols.bgp.operator.views.bgp.NlriDetailView'
+        'bgpspeaker.operator.views.bgp.NlriDetailView'
     )
     is_withdraw = fields.DataField('is_withdraw')
     nexthop = fields.DataField('nexthop')
     pathattr_map = fields.DataField('pathattr_map')
     source = fields.RelatedViewField(
         'source',
-        'ryu.services.protocols.bgp.operator.views.bgp.PeerDetailView'
+        'bgpspeaker.operator.views.bgp.PeerDetailView'
     )
 
     def encode(self):
         ret = super(PathDetailView, self).encode()
         ret['nlri'] = self.rel('nlri').encode()
         ret['route_family'] = self.rel('route_family').encode()
-        as_path = self.get_field('pathattr_map').get(BGP_ATTR_TYPE_AS_PATH)
-        origin = self.get_field('pathattr_map').get(BGP_ATTR_TYPE_ORIGIN)
-        metric = self.get_field('pathattr_map').get(
-            BGP_ATTR_TYPE_MULTI_EXIT_DISC)
+        as_path = self.get_field('pathattr_map').get(pathattr.AsPath.ATTR_NAME)
+        origin = self.get_field('pathattr_map').get(pathattr.Origin.ATTR_NAME)
+        metric = self.get_field('pathattr_map').get(pathattr.Med.ATTR_NAME)
         local_pref = self.get_field('pathattr_map').get(
-            BGP_ATTR_TYPE_LOCAL_PREF
+            pathattr.LocalPref.ATTR_NAME
         )
 
         ret['as_path'] = as_path.value if as_path else None
         ret['origin'] = origin.value if origin else None
         ret['metric'] = metric.value if metric else None
         ret['local_pref'] = local_pref.value if local_pref else None
-        ext = ret['pathattr_map'].get(BGP_ATTR_TYPE_EXTENDED_COMMUNITIES)
+        ext = ret['pathattr_map'].get(pathattr.ExtCommunity.ATTR_NAME)
         del ret['pathattr_map']
         if ext:
             ret['rt_list'] = ext.rt_list
@@ -173,38 +166,38 @@ class PathDetailView(OperatorDetailView):
 class SentRouteDetailView(OperatorDetailView):
     path = fields.RelatedViewField(
         'path',
-        'ryu.services.protocols.bgp.operator.views.bgp.PathDetailView',
+        'bgpspeaker.operator.views.bgp.PathDetailView',
     )
     peer = fields.RelatedViewField(
         '_sent_peer',
-        'ryu.services.protocols.bgp.operator.views.bgp.PeerDetailView'
+        'bgpspeaker.operator.views.bgp.PeerDetailView'
     )
 
 
 class DestinationDetailView(OperatorDetailView):
     table = fields.RelatedViewField(
         '_table',
-        'ryu.services.protocols.bgp.operator.views.bgp.TableDetailView',
+        'bgpspeaker.operator.views.bgp.TableDetailView',
     )
     best_path = fields.RelatedViewField(
         'best_path',
-        'ryu.services.protocols.bgp.operator.views.bgp.PathDetailView'
+        'bgpspeaker.operator.views.bgp.PathDetailView'
     )
     known_path_list = fields.RelatedListViewField(
         'known_path_list',
-        'ryu.services.protocols.bgp.operator.views.bgp.PathListView'
+        'bgpspeaker.operator.views.bgp.PathListView'
     )
     new_path_list = fields.RelatedListViewField(
         '_new_path_list',
-        'ryu.services.protocols.bgp.operator.views.bgp.PathListView'
+        'bgpspeaker.operator.views.bgp.PathListView'
     )
     withdraw_list = fields.RelatedListViewField(
         '_withdraw_list',
-        'ryu.services.protocols.bgp.operator.views.bgp.PathListView'
+        'bgpspeaker.operator.views.bgp.PathListView'
     )
     sent_routes = fields.RelatedListViewField(
         'sent_routes',
-        'ryu.services.protocols.bgp.operator.views.bgp.SentRouteListView'
+        'bgpspeaker.operator.views.bgp.SentRouteListView'
     )
     nlri = fields.DataField('nlri')
     route_family = fields.DataField('route_family')
@@ -217,18 +210,16 @@ class IpNlriDetailView(OperatorDetailView):
 
 class VpnNlriDetailView(IpNlriDetailView):
     labels = fields.DataField('label_list')
-    rd = fields.DataField('route_dist')
+    rd = fields.DataField('route_disc')
 
 
 class NlriDetailView(OperatorDetailView):
     def __new__(cls, obj, filter_func=None):
-        from ryu.lib.packet.bgp import LabelledVPNIPAddrPrefix
-        from ryu.lib.packet.bgp import LabelledVPNIP6AddrPrefix
-        from ryu.lib.packet.bgp import IPAddrPrefix, IP6AddrPrefix
-        if isinstance(obj, (LabelledVPNIPAddrPrefix,
-                            LabelledVPNIP6AddrPrefix)):
+        from ryu.services.protocols.bgp.protocols.bgp.nlri import Vpnv4, Vpnv6
+        from ryu.services.protocols.bgp.protocols.bgp.nlri import Ipv4, Ipv6
+        if isinstance(obj, (Vpnv4, Vpnv6)):
             return VpnNlriDetailView(obj)
-        elif isinstance(obj, (IPAddrPrefix, IP6AddrPrefix)):
+        elif isinstance(obj, (Ipv4, Ipv6)):
             return IpNlriDetailView(obj)
         else:
             return OperatorDetailView(obj, filter_func)

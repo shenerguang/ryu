@@ -20,16 +20,6 @@
 import abc
 import logging
 
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_ORIGIN
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_AS_PATH
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_EXTENDED_COMMUNITIES
-from ryu.lib.packet.bgp import BGP_ATTR_TYPE_MULTI_EXIT_DISC
-from ryu.lib.packet.bgp import BGPPathAttributeOrigin
-from ryu.lib.packet.bgp import BGPPathAttributeAsPath
-from ryu.lib.packet.bgp import BGPPathAttributeExtendedCommunities
-from ryu.lib.packet.bgp import BGPTwoOctetAsSpecificExtendedCommunity
-from ryu.lib.packet.bgp import BGPPathAttributeMultiExitDisc
-
 from ryu.services.protocols.bgp.base import OrderedDict
 from ryu.services.protocols.bgp.constants import VPN_TABLE
 from ryu.services.protocols.bgp.constants import VRF_TABLE
@@ -40,6 +30,7 @@ from ryu.services.protocols.bgp.utils.stats import LOCAL_ROUTES
 from ryu.services.protocols.bgp.utils.stats import REMOTE_ROUTES
 from ryu.services.protocols.bgp.utils.stats import RESOURCE_ID
 from ryu.services.protocols.bgp.utils.stats import RESOURCE_NAME
+from ryu.services.protocols.bgp.protocols.bgp import pathattr
 
 LOG = logging.getLogger('bgpspeaker.info_base.vrf')
 
@@ -147,11 +138,11 @@ class VrfTable(Table):
         source = vpn_path.source
         if not source:
             source = VRF_TABLE
-        ip, masklen = vpn_path.nlri.prefix.split('/')
-        vrf_nlri = self.NLRI_CLASS(length=int(masklen), addr=ip)
+
+        vrf_nlri = self.NLRI_CLASS(vpn_path.nlri.prefix)
 
         vpn_nlri = vpn_path.nlri
-        puid = self.VRF_PATH_CLASS.create_puid(vpn_nlri.route_dist,
+        puid = self.VRF_PATH_CLASS.create_puid(vpn_nlri.route_disc,
                                                vpn_nlri.prefix)
         vrf_path = self.VRF_PATH_CLASS(
             puid,
@@ -210,30 +201,15 @@ class VrfTable(Table):
             # in the path. Hence we do not add these attributes here.
             from ryu.services.protocols.bgp.core import EXPECTED_ORIGIN
 
-            pattrs[BGP_ATTR_TYPE_ORIGIN] = BGPPathAttributeOrigin(
-                EXPECTED_ORIGIN)
-            pattrs[BGP_ATTR_TYPE_AS_PATH] = BGPPathAttributeAsPath([])
-            communities = []
-            for rt in vrf_conf.export_rts:
-                as_num, local_admin = rt.split(':')
-                subtype = 2
-                communities.append(BGPTwoOctetAsSpecificExtendedCommunity(
-                                   as_number=int(as_num),
-                                   local_administrator=int(local_admin),
-                                   subtype=subtype))
-            for soo in vrf_conf.soo_list:
-                as_num, local_admin = soo.split(':')
-                subtype = 3
-                communities.append(BGPTwoOctetAsSpecificExtendedCommunity(
-                                   as_number=int(as_num),
-                                   local_administrator=int(local_admin),
-                                   subtype=subtype))
-
-            pattrs[BGP_ATTR_TYPE_EXTENDED_COMMUNITIES] = \
-                BGPPathAttributeExtendedCommunities(communities=communities)
+            pattrs[pathattr.Origin.ATTR_NAME] = \
+                pathattr.Origin(EXPECTED_ORIGIN)
+            pattrs[pathattr.AsPath.ATTR_NAME] = pathattr.AsPath([])
+            pattrs[pathattr.ExtCommunity.ATTR_NAME] = pathattr.ExtCommunity(
+                rt_list=vrf_conf.export_rts, soo_list=vrf_conf.soo_list)
             if vrf_conf.multi_exit_disc:
-                pattrs[BGP_ATTR_TYPE_MULTI_EXIT_DISC] = \
-                    BGPPathAttributeMultiExitDisc(vrf_conf.multi_exit_disc)
+                pattrs[pathattr.Med.ATTR_NAME] = pathattr.Med(
+                    vrf_conf.multi_exit_disc
+                )
 
             table_manager = self._core_service.table_manager
             if gen_lbl and next_hop:
@@ -279,7 +255,7 @@ class VrfDest(Destination):
 
     def __init__(self, table, nlri):
         super(VrfDest, self).__init__(table, nlri)
-        self._route_dist = self._table.vrf_conf.route_dist
+        self._route_disc = self._table.vrf_conf.route_dist
 
     def _best_path_lost(self):
         # Have to send update messages for withdraw of best-path to Network
@@ -295,10 +271,10 @@ class VrfDest(Destination):
             # out of old best path and queue it into flexinet sinks.
             old_best_path = old_best_path.clone(for_withdrawal=True)
             self._core_service.update_flexinet_peers(old_best_path,
-                                                     self._route_dist)
+                                                     self._route_disc)
         else:
             # Create withdraw-path out of old best path.
-            gpath = old_best_path.clone_to_vpn(self._route_dist,
+            gpath = old_best_path.clone_to_vpn(self._route_disc,
                                                for_withdrawal=True)
             # Insert withdraw into global table and enqueue the destination
             # for further processing.
@@ -327,16 +303,16 @@ class VrfDest(Destination):
             if not old_best_path or (old_best_path and really_diff()):
                 # Create OutgoingRoute and queue it into NC sink.
                 self._core_service.update_flexinet_peers(
-                    best_path, self._route_dist
+                    best_path, self._route_disc
                 )
         else:
             # If NC is source, we create new path and insert into global
             # table.
-            gpath = best_path.clone_to_vpn(self._route_dist)
+            gpath = best_path.clone_to_vpn(self._route_disc)
             tm = self._core_service.table_manager
             tm.learn_path(gpath)
             LOG.debug('VRF table %s has new best path: %s' %
-                      (self._route_dist, self.best_path))
+                      (self._route_disc, self.best_path))
 
     def _remove_withdrawals(self):
         """Removes withdrawn paths.
@@ -466,9 +442,9 @@ class VrfPath(Path):
         return self._label_list[:]
 
     @staticmethod
-    def create_puid(route_dist, ip_prefix):
-        assert route_dist and ip_prefix
-        return str(route_dist) + ':' + ip_prefix
+    def create_puid(route_disc, ip_prefix):
+        assert route_disc and ip_prefix
+        return route_disc + ':' + ip_prefix
 
     def clone(self, for_withdrawal=False):
         pathattrs = None
@@ -487,12 +463,10 @@ class VrfPath(Path):
         )
         return clone
 
-    def clone_to_vpn(self, route_dist, for_withdrawal=False):
-        ip, masklen = self._nlri.prefix.split('/')
-        vpn_nlri = self.VPN_NLRI_CLASS(length=int(masklen),
-                                       addr=ip,
-                                       labels=self.label_list,
-                                       route_dist=route_dist)
+    def clone_to_vpn(self, route_disc, for_withdrawal=False):
+        vpn_nlri = self.VPN_NLRI_CLASS(
+            self.label_list, route_disc, self._nlri.prefix
+        )
 
         pathattrs = None
         if not for_withdrawal:
@@ -552,5 +526,5 @@ class VrfRtImportMap(ImportMap):
         self._rt = rt
 
     def match(self, vrf_path):
-        extcomm = vrf_path.pathattr_map.get(BGP_ATTR_TYPE_EXTENDED_COMMUNITIES)
+        extcomm = vrf_path.pathattr_map.get('extcommunity')
         return extcomm is not None and self._rt in extcomm.rt_list

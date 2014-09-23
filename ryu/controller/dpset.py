@@ -14,12 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Manage switches.
-
-Planned to be replaced by ryu/topology.
-"""
-
 import logging
 
 from ryu.base import app_manager
@@ -118,7 +112,7 @@ class DPSet(app_manager.RyuApp):
             self.logger.debug('DPSET: Forgetting datapath %s', self.dps[dp.id])
             self.logger.debug('DPSET: New datapath %s', dp)
         self.dps[dp.id] = dp
-        if dp.id not in self.port_state:
+        if not dp.id in self.port_state:
             self.port_state[dp.id] = PortState()
             ev = EventDP(dp, True)
             for port in dp.ports.values():
@@ -128,7 +122,7 @@ class DPSet(app_manager.RyuApp):
 
     def _unregister(self, dp):
         # see the comment in _register().
-        if dp not in self.dps.values():
+        if not dp in self.dps.values():
             return
         LOG.debug('DPSET: unregister datapath %s', dp)
         assert self.dps[dp.id] == dp

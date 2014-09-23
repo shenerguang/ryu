@@ -50,9 +50,6 @@ Protocol Header classes
 .. automodule:: ryu.lib.packet.icmpv6
    :members:
 
-.. automodule:: ryu.lib.packet.cfm
-   :members:
-
 .. automodule:: ryu.lib.packet.tcp
    :members:
 

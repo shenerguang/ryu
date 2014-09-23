@@ -94,7 +94,7 @@ class RpcSession(Activity):
     """
 
     def __init__(self, socket, outgoing_msg_sink_iter):
-        super(RpcSession, self).__init__("RpcSession(%s)" % socket)
+        super(RpcSession, self).__init__()
         import msgpack
 
         self._packer = msgpack.Packer()
@@ -255,7 +255,7 @@ def _create_prefix_notif(outgoing_msg, rpc_session):
     assert path.source is not None
     if path.source != VRF_TABLE:
         # Extract relevant info for update-add/update-delete.
-        params = [{ROUTE_DISTINGUISHER: outgoing_msg.route_dist,
+        params = [{ROUTE_DISTINGUISHER: outgoing_msg.route_disc,
                    PREFIX: vpn_nlri.prefix,
                    NEXT_HOP: path.nexthop,
                    VPN_LABEL: path.label_list[0],
@@ -270,7 +270,7 @@ def _create_prefix_notif(outgoing_msg, rpc_session):
                                                       params)
     else:
         # Extract relevant info for update-add/update-delete.
-        params = [{ROUTE_DISTINGUISHER: outgoing_msg.route_dist,
+        params = [{ROUTE_DISTINGUISHER: outgoing_msg.route_disc,
                    PREFIX: vpn_nlri.prefix,
                    NEXT_HOP: path.nexthop,
                    VRF_RF: VrfConf.rf_2_vrf_rf(path.route_family),
@@ -336,8 +336,7 @@ class _NetworkController(FlexinetPeer, Activity):
         sock_addr = (apgw_rpc_bind_ip, apgw_rpc_bind_port)
         LOG.debug('NetworkController started listening for connections...')
 
-        server_thread, socket = self._listen_tcp(sock_addr,
-                                                 self._start_rpc_session)
+        server_thread = self._listen_tcp(sock_addr, self._start_rpc_session)
         self.pause(0)
         server_thread.wait()
 

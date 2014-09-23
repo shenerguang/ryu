@@ -90,7 +90,7 @@ run_tests() {
 run_pylint() {
   echo "Running pylint ..."
   PYLINT_OPTIONS="--rcfile=.pylintrc --output-format=parseable"
-  PYLINT_INCLUDE="ryu bin/ryu bin/ryu-manager ryu/tests/bin/ryu-client"
+  PYLINT_INCLUDE="ryu bin/rpc-cli bin/ryu-manager bin/neutron-ofagent-agent ryu/tests/bin/ryu-client ryu/tests/bin/of-config-cli"
   export PYTHONPATH=$PYTHONPATH:.ryu
   PYLINT_LOG=pylint.log
 
@@ -106,7 +106,8 @@ run_pylint() {
 run_pep8() {
   echo "Running pep8 ..."
 
-  PEP8_OPTIONS="--repeat --show-source"
+  PEP8_EXCLUDE="vcsversion.py,*.pyc,contrib,dictconfig.py"
+  PEP8_OPTIONS="--exclude=$PEP8_EXCLUDE --repeat --show-source"
   PEP8_INCLUDE="ryu setup*.py"
   PEP8_LOG=pep8.log
   ${wrapper} pep8 $PEP8_OPTIONS $PEP8_INCLUDE | tee $PEP8_LOG
